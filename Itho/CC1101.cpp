@@ -7,7 +7,7 @@
 #include "../suart/SerialDebug.h"
 
 // default constructor
-CC1101::CC1101(SPI *spi)
+CC1101::CC1101(SPITHO *spi)
 {
 	this->spi = spi;
 } //CC1101
@@ -19,7 +19,7 @@ CC1101::~CC1101()
 
 void CC1101::spi_waitMiso()
 {
-	while ((SPI_PORT_MISO >> SPI_PIN_MISO) & 0x01);
+	while ((SPITHO_PORT_MISO >> SPITHO_PIN_MISO) & 0x01);
 }
 
 void CC1101::init()
@@ -100,7 +100,7 @@ uint8_t CC1101::readRegisterMedian3(uint8_t address)
 }
 
 /* Known SPI/26MHz synchronization bug (see CC1101 errata)
-This issue affects the following registers: SPI status byte (fields STATE and FIFO_BYTES_AVAILABLE), 
+This issue affects the following registers: SPITHO status byte (fields STATE and FIFO_BYTES_AVAILABLE),
 FREQEST or RSSI while the receiver is active, MARCSTATE at any time other than an IDLE radio state, 
 RXBYTES when receiving or TXBYTES when transmitting, and WORTIME1/WORTIME0 at any time.*/
 uint8_t CC1101::readRegisterWithSyncProblem(uint8_t address, uint8_t registerType)

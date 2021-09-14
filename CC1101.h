@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <avr/interrupt.h>
 #include "CC1101Packet.h"
-#include "../bus/SPI.h"
+#include "SPI.h"
+//#include <SPI.h>
 
 /*	Type of transfers */
 #define CC1101_WRITE_BURST						0x40
@@ -164,12 +165,12 @@ enum CC1101ChipStates
 
 class CC1101
 {
-	protected:
-		SPI *spi;	
+	//protected:
+	SPITHO *spi;
 		
 	//functions
 	public:
-		CC1101(SPI *spi);
+		CC1101(SPITHO *spi);
 		~CC1101();
 	
 		//spi

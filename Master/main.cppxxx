@@ -28,7 +28,7 @@ int main(void)
 	DigitalPin ss(&PORTB,2);
 	
 	//set up SPI
-	SPI spi(&ss);
+	SPITHO spi(&ss);
 	spi.init();
 	
 	//init CC1101

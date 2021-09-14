@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include "CC1101.h"
 #include "IthoPacket.h"
-#include "../time/millis.h"
+#include "millis.h"
 
 //pa table settings
 const uint8_t ithoPaTableSend[8] = {0x6F, 0x26, 0x2E, 0x8C, 0x87, 0xCD, 0xC7, 0xC0};
@@ -87,7 +87,7 @@ class IthoCC1101 : protected CC1101
 		
 	//functions
 	public:
-		IthoCC1101(SPI *spi, uint8_t counter = 0, uint8_t sendTries = 3);		//set initial counter value
+		IthoCC1101(SPITHO *spi, uint8_t counter = 0, uint8_t sendTries = 3);		//set initial counter value
 		~IthoCC1101();
 		
 		//init

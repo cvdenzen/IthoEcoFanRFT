@@ -5,28 +5,28 @@
 #include "SPI.h"
 
 // default constructor
-SPI::SPI(DigitalPin *ssPin)
+SPITHO::SPITHO(DigitalPin *ssPin)
 {
 	this->ssPin = ssPin;
 } //SPI
 
 // default destructor
-SPI::~SPI()
+SPITHO::~SPITHO()
 {
 } //~SPI
 
-void SPI::init()
+void SPITHO::init()
 {
     /* enable outputs for MOSI, SCK, SS, input for MISO */
-    SPI_DDR_MOSI |= (1 << SPI_PIN_MOSI);	//mosi output
-    SPI_DDR_SCK |= (1 << SPI_PIN_SCK);		//sck output
+    SPITHO_DDR_MOSI |= (1 << SPITHO_PIN_MOSI);	//mosi output
+    SPITHO_DDR_SCK |= (1 << SPITHO_PIN_SCK);		//sck output
 	ssPin->makeOutput();					//ss output
-    SPI_DDR_MISO &= ~(1 << SPI_PIN_MISO);	//miso input
+    SPITHO_DDR_MISO &= ~(1 << SPITHO_PIN_MISO);	//miso input
 		
     deselect();
 
-    SPCR =	(0 << SPIE) | /* SPI Interrupt Enable */
-			(1 << SPE)  | /* SPI Enable */
+    SPCR =	(0 << SPIE) | /* SPITHO Interrupt Enable */
+			(1 << SPE)  | /* SPITHO Enable */
 			(0 << DORD) | /* Data Order: MSB first */
 			(1 << MSTR) | /* Master mode */
 			(0 << CPOL) | /* Clock Polarity: SCK low when idle */
@@ -38,22 +38,22 @@ void SPI::init()
     deselect();
 }
 
-void SPI::waitMiso()
+void SPITHO::waitMiso()
 {
-	while ((SPI_PORT_MISO >> SPI_PIN_MISO) & 0x01);
+	while ((SPITHO_PORT_MISO >> SPITHO_PIN_MISO) & 0x01);
 }
 
-void SPI::select()
+void SPITHO::select()
 {
 	ssPin->write(false);
 }
 
-void SPI::deselect()
+void SPITHO::deselect()
 {
 	ssPin->write(true);
 }
 
-uint8_t SPI::write(uint8_t value)
+uint8_t SPITHO::write(uint8_t value)
 {
     SPDR = value;
     /* wait for byte to be shifted out */
@@ -63,7 +63,7 @@ uint8_t SPI::write(uint8_t value)
 	return SPDR;
 }
 
-uint8_t SPI::read()
+uint8_t SPITHO::read()
 {
     SPDR = 0xFF;
     while (!(SPSR & (1 << SPIF)));
@@ -72,12 +72,12 @@ uint8_t SPI::read()
     return SPDR;	
 }
 
-void SPI::attachInterrupt() 
+void SPITHO::attachInterrupt()
 {
 	SPCR |= (1<<SPIE);
 }
 
-void SPI::detachInterrupt() 
+void SPITHO::detachInterrupt()
 {
 	SPCR &= ~(1<<SPIE);
 }
