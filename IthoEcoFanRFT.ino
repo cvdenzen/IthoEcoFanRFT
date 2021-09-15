@@ -88,7 +88,7 @@ MyMessage lightMsg(0, V_LIGHT);
 #include "SerialDebug.h"
 #include "IthoCC1101.h"
 #include "IthoPacket.h"
-
+IthoCC1101 *rf;
 void before()
 {
   wdt_disable();
@@ -104,7 +104,7 @@ void before()
   millis_init();
   delay_ms(500);
   
-  //slave select CC1101
+  //system/slave select CC1101
   DigitalPin ss(&PORTC,0);
   
   //set up SPI
@@ -112,7 +112,7 @@ void before()
   spitho.init();
   
   //init CC1101
-  IthoCC1101 rf(&spitho);
+  rf(&spitho);
   rf.init();
   
   //set CC1101 registers
@@ -244,6 +244,68 @@ void loop()
     }
   }
 
+
+    if (rf.checkForNewPacket())
+    {
+      packet = rf.getLastPacket();
+      
+      //show counter
+      debug.serOut("counter=");
+      debug.serOutInt(packet.counter);
+      debug.serOut(", ");
+      
+      //show command
+      switch (packet.command)
+      {
+        case unknown:
+          debug.serOut("unknown\n");
+          break;
+        case rft_fullpower:
+          debug.serOut("fullpower\n");
+          break;
+        case rft_standby:
+        case duco_standby:
+          debug.serOut("standby\n");
+          break;
+        case rft_low:
+        case duco_low:
+          debug.serOut("low\n");
+          break;
+        case rft_medium:
+        case duco_medium:
+          debug.serOut("medium\n");
+          break;
+        case rft_high:
+        case duco_high:
+          debug.serOut("high\n");
+          break;
+        case rft_timer1:
+          debug.serOut("timer1\n");
+          break;
+        case rft_timer2:
+          debug.serOut("timer2\n");
+          break;
+        case rft_timer3:
+          debug.serOut("timer3\n");
+          break;
+        case join:
+          debug.serOut("join\n");
+          break;
+        case leave:
+          debug.serOut("leave\n");
+          break;
+      }
+        
+    }
+    
+    if (millis() - last > 15000)
+    {
+      last = millis();
+      rf.sendCommand(rft_fullpower);
+      rf.initReceive();
+    }
+
+  
   
   // sleep with time is difficult
   delay(SLEEP_TIME);

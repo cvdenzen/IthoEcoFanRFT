@@ -55,5 +55,5 @@ class SPITHO
 
 }; //SPI
 
-SPITHO *spi;
+//SPITHO *spi;
 #endif //__SPITHO_H__
