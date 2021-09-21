@@ -1,16 +1,16 @@
 /*
- * Author: Klusjesman
+ * Author: Klusjesman, modified bij supersjimmie for Arduino/ESP8266
  */
 
 #ifndef __CC1101_H__
 #define __CC1101_H__
 
 #include <stdio.h>
-#include <avr/interrupt.h>
 #include "CC1101Packet.h"
-#include "SPI.h"
-//#include <SPI.h>
-
+#include <SPI.h>
+// On Arduino, SPI pins are predefined
+// But not always the right way
+#define CC1101_SS 14
 /*	Type of transfers */
 #define CC1101_WRITE_BURST						0x40
 #define CC1101_READ_SINGLE						0x80
@@ -165,12 +165,11 @@ enum CC1101ChipStates
 
 class CC1101
 {
-	//protected:
-	SPITHO *spi;
+	protected:
 		
 	//functions
 	public:
-		CC1101(SPITHO *spi);
+		CC1101();
 		~CC1101();
 	
 		//spi
@@ -187,13 +186,15 @@ class CC1101
 		void writeBurstRegister(uint8_t address, uint8_t* data, uint8_t length);
 		void readBurstRegister(uint8_t* buffer, uint8_t address, uint8_t length);
 		
-		bool sendData(CC1101Packet *packet);
+		void sendData(CC1101Packet *packet);
 		uint8_t receiveData(CC1101Packet* packet, uint8_t length);
 	
 	private:
-		CC1101();
 		CC1101( const CC1101 &c );
 		CC1101& operator=( const CC1101 &c );
+		// SPI helper functions
+		void select(void);
+		void deselect(void);
 		
 	protected:
 		uint8_t readRegister(uint8_t address);

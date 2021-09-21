@@ -56,6 +56,32 @@
 #define MY_NODE_ID 156
 
 #include <MySensors.h>
+
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Start ArjenHiemstra IthoEcoFan
+
+//#include <SPI.h>
+#include "IthoCC1101.h"
+#include "IthoPacket.h"
+
+#define ITHO_IRQ_PIN 3 //cc1101 pin GD02, connected to pin 3 on Carl's Arduino Pro Mini D2(GPIO4) on NodeMCU
+
+IthoCC1101 rf;
+IthoPacket packet;
+
+const uint8_t RFTid[] = {11, 22, 33}; // my ID
+
+bool ITHOhasPacket = false;
+IthoCommand RFTcommand[3] = {IthoUnknown, IthoUnknown, IthoUnknown};
+byte RFTRSSI[3] = {0, 0, 0};
+byte RFTcommandpos = 0;
+IthoCommand RFTlastCommand = IthoLow;
+IthoCommand RFTstate = IthoUnknown;
+IthoCommand savedRFTstate = IthoUnknown;
+bool RFTidChk[3] = {false, false, false};
+// End of ArjenHiemstra IthoEcoFan
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 #include <DallasTemperature.h>
 #include <OneWire.h>
 
@@ -82,13 +108,7 @@ static int16_t currentLevel = 0;  // Current dim level...
 MyMessage dimmerMsg(0, V_DIMMER);
 MyMessage lightMsg(0, V_LIGHT);
 
-#include <SPI.h>
-#include "millis.h"
-#include "delay.h"
-#include "SerialDebug.h"
-#include "IthoCC1101.h"
-#include "IthoPacket.h"
-IthoCC1101 *rf;
+
 void before()
 {
   wdt_disable();
@@ -98,40 +118,18 @@ void before()
   sensors.begin();
   Serial.println("before(): after sensors.begin");
   
-  IthoPacket packet;
-  millis_t last;
-  
-  millis_init();
-  delay_ms(500);
-  
-  //system/slave select CC1101
-  DigitalPin ss(&PORTC,0);
-  
-  //set up SPI
-  SPITHO spitho(&ss);
-  spitho.init();
-  
-  //init CC1101
-  rf(&spitho);
-  rf.init();
-  
-  //set CC1101 registers
-  rf.initReceive();
-      
-  debug.serOut("start\n");
-  last = millis();
-  sei();
-  Serial.println("before(): after cc1101 init,sei()");
 
 }
 
 void setup()
 {
+  setupArjen();
   // Pull the gateway's current dim level - restore light level upon node power-up
   request( 0, V_DIMMER );
   // requestTemperatures() will not block current thread
   //sensors.setWaitForConversion(false);
   Serial.print("End setup for node number ");Serial.println(MY_NODE_ID);
+
 }
 
 void presentation() {
@@ -214,6 +212,7 @@ void fadeToLevel( int toLevel )
     delay( FADE_DELAY );
   }
 }
+static uint32_t last=0;
 void loop()
 {
   // Fetch temperatures from Dallas sensors
@@ -244,69 +243,170 @@ void loop()
     }
   }
 
-
-    if (rf.checkForNewPacket())
-    {
-      packet = rf.getLastPacket();
-      
-      //show counter
-      debug.serOut("counter=");
-      debug.serOutInt(packet.counter);
-      debug.serOut(", ");
-      
-      //show command
-      switch (packet.command)
-      {
-        case unknown:
-          debug.serOut("unknown\n");
-          break;
-        case rft_fullpower:
-          debug.serOut("fullpower\n");
-          break;
-        case rft_standby:
-        case duco_standby:
-          debug.serOut("standby\n");
-          break;
-        case rft_low:
-        case duco_low:
-          debug.serOut("low\n");
-          break;
-        case rft_medium:
-        case duco_medium:
-          debug.serOut("medium\n");
-          break;
-        case rft_high:
-        case duco_high:
-          debug.serOut("high\n");
-          break;
-        case rft_timer1:
-          debug.serOut("timer1\n");
-          break;
-        case rft_timer2:
-          debug.serOut("timer2\n");
-          break;
-        case rft_timer3:
-          debug.serOut("timer3\n");
-          break;
-        case join:
-          debug.serOut("join\n");
-          break;
-        case leave:
-          debug.serOut("leave\n");
-          break;
-      }
-        
-    }
-    
-    if (millis() - last > 15000)
-    {
-      last = millis();
-      rf.sendCommand(rft_fullpower);
-      rf.initReceive();
-    }
-
+  loopArjen();
   
   
   // sleep with time is difficult
   delay(SLEEP_TIME);
 }
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Start ArjenHiemstra Itho
+
+void setupArjen(void) {
+  //Serial.begin(115200);
+  delay(500);
+  Serial.println("setupArjen begin");
+  rf.setDeviceID(13, 123, 42); //DeviceID used to send commands, can also be changed on the fly for multi itho control
+  Serial.println("setupArjen rf.setDeviceID() done");
+  rf.init();
+  Serial.println("setupArjen rf.init() done");
+  sendRegister();
+  Serial.println("join command sent");
+  pinMode(ITHO_IRQ_PIN, INPUT);
+  attachInterrupt(ITHO_IRQ_PIN, ITHOcheck, FALLING);
+}
+
+void loopArjen(void) {
+  // do whatever you want, check (and reset) the ITHOhasPacket flag whenever you like
+  if (ITHOhasPacket) {
+    if (rf.checkForNewPacket()) {
+      IthoCommand cmd = rf.getLastCommand();
+      if (++RFTcommandpos > 2) RFTcommandpos = 0;  // store information in next entry of ringbuffers
+      RFTcommand[RFTcommandpos] = cmd;
+      RFTRSSI[RFTcommandpos]    = rf.ReadRSSI();
+      bool chk = rf.checkID(RFTid);
+      RFTidChk[RFTcommandpos]   = chk;
+      if ((cmd != IthoUnknown)) {  // only act on good cmd and correct id.
+        showPacket();
+      }
+    }
+  }
+}
+
+/* ICACHE_RAM_ATTR ?? */ void ITHOcheck() {
+  ITHOhasPacket = true;
+}
+
+void showPacket() {
+  ITHOhasPacket = false;
+  uint8_t goodpos = findRFTlastCommand();
+  if (goodpos != -1)  RFTlastCommand = RFTcommand[goodpos];
+  else                RFTlastCommand = IthoUnknown;
+  //show data
+  Serial.print(F("RFT Current Pos: "));
+  Serial.print(RFTcommandpos);
+  Serial.print(F(", Good Pos: "));
+  Serial.println(goodpos);
+  Serial.print(F("Stored 3 commands: "));
+  Serial.print(RFTcommand[0]);
+  Serial.print(F(" "));
+  Serial.print(RFTcommand[1]);
+  Serial.print(F(" "));
+  Serial.print(RFTcommand[2]);
+  Serial.print(F(" / Stored 3 RSSI's:     "));
+  Serial.print(RFTRSSI[0]);
+  Serial.print(F(" "));
+  Serial.print(RFTRSSI[1]);
+  Serial.print(F(" "));
+  Serial.print(RFTRSSI[2]);
+  Serial.print(F(" / Stored 3 ID checks: "));
+  Serial.print(RFTidChk[0]);
+  Serial.print(F(" "));
+  Serial.print(RFTidChk[1]);
+  Serial.print(F(" "));
+  Serial.print(RFTidChk[2]);
+  Serial.print(F(" / Last ID: "));
+  Serial.print(rf.getLastIDstr(false));
+
+  Serial.print(F(" / Command = "));
+  //show command
+  switch (RFTlastCommand) {
+    case IthoUnknown:
+      Serial.print("unknown\n");
+      break;
+    case IthoLow:
+      Serial.print("low\n");
+      break;
+    case IthoMedium:
+      Serial.print("medium\n");
+      break;
+    case IthoHigh:
+      Serial.print("high\n");
+      break;
+    case IthoFull:
+      Serial.print("full\n");
+      break;
+    case IthoTimer1:
+      Serial.print("timer1\n");
+      break;
+    case IthoTimer2:
+      Serial.print("timer2\n");
+      break;
+    case IthoTimer3:
+      Serial.print("timer3\n");
+      break;
+    case IthoJoin:
+      Serial.print("join\n");
+      break;
+    case IthoLeave:
+      Serial.print("leave\n");
+      break;
+  }
+}
+
+uint8_t findRFTlastCommand() {
+  if (RFTcommand[RFTcommandpos] != IthoUnknown)               return RFTcommandpos;
+  if ((RFTcommandpos == 0) && (RFTcommand[2] != IthoUnknown)) return 2;
+  if ((RFTcommandpos == 0) && (RFTcommand[1] != IthoUnknown)) return 1;
+  if ((RFTcommandpos == 1) && (RFTcommand[0] != IthoUnknown)) return 0;
+  if ((RFTcommandpos == 1) && (RFTcommand[2] != IthoUnknown)) return 2;
+  if ((RFTcommandpos == 2) && (RFTcommand[1] != IthoUnknown)) return 1;
+  if ((RFTcommandpos == 2) && (RFTcommand[0] != IthoUnknown)) return 0;
+  return -1;
+}
+
+void sendRegister() {
+  Serial.println("sending join...");
+  rf.sendCommand(IthoJoin);
+  Serial.println("sending join done.");
+}
+
+void sendStandbySpeed() {
+  Serial.println("sending standby...");
+  rf.sendCommand(IthoStandby);
+  Serial.println("sending standby done.");
+}
+
+void sendLowSpeed() {
+  Serial.println("sending low...");
+  rf.sendCommand(IthoLow);
+  Serial.println("sending low done.");
+}
+
+void sendMediumSpeed() {
+  Serial.println("sending medium...");
+  rf.sendCommand(IthoMedium);
+  Serial.println("sending medium done.");
+}
+
+void sendHighSpeed() {
+  Serial.println("sending high...");
+  rf.sendCommand(IthoHigh);
+  Serial.println("sending high done.");
+}
+
+void sendFullSpeed() {
+  Serial.println("sending FullSpeed...");
+  rf.sendCommand(IthoFull);
+  Serial.println("sending FullSpeed done.");
+}
+
+void sendTimer() {
+  Serial.println("sending timer...");
+  rf.sendCommand(IthoTimer1);
+  Serial.println("sending timer done.");
+}
+
+  // End of ArjenHiemstra's IthoEcoFan
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  
