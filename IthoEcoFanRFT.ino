@@ -263,6 +263,7 @@ void setupArjen(void) {
   sendRegister();
   Serial.println("join command sent");
   pinMode(ITHO_IRQ_PIN, INPUT);
+  pinMode(CC1101_SS,OUTPUT); // ??
   attachInterrupt(ITHO_IRQ_PIN, ITHOcheck, FALLING);
 }
 

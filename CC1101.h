@@ -10,7 +10,7 @@
 #include <SPI.h>
 // On Arduino, SPI pins are predefined
 // But not always the right way
-#define CC1101_SS 14
+#define CC1101_SS A0
 /*	Type of transfers */
 #define CC1101_WRITE_BURST						0x40
 #define CC1101_READ_SINGLE						0x80
@@ -174,6 +174,7 @@ class CC1101
 	
 		//spi
 		void spi_waitMiso();
+    void spi_waitMiso(unsigned long maxDurationMillis);
 	
 		//cc1101
 		void init();

@@ -28,9 +28,21 @@ inline void CC1101::deselect(void) {
 	digitalWrite(CC1101_SS, HIGH);
 }
 
+
+void CC1101::spi_waitMiso(unsigned long maxDurationMillis)
+{
+    unsigned long startMillis=millis();
+    unsigned long maxMillis=startMillis+maxDurationMillis;
+    while((digitalRead(MISO) == HIGH) && (millis()<maxMillis)) yield();
+    if (digitalRead(MISO) == HIGH) {
+      Serial.print("CC1101::spi_waitMiso timeout, timeout (milliseconds)=");Serial.println(maxDurationMillis);
+    }
+}
+
 void CC1101::spi_waitMiso()
 {
-    while(digitalRead(MISO) == HIGH) yield();
+    unsigned long maxDurationMillis=10000;
+    this->spi_waitMiso(maxDurationMillis);
 }
 
 void CC1101::init()
@@ -51,8 +63,11 @@ void CC1101::reset()
 	spi_waitMiso();
 	SPI.transfer(CC1101_SRES);
 	delay(10);
+  //Serial.println("End SPI.transfer, delay in reset()");
 	spi_waitMiso();
+  //Serial.println("End SPI.transfer.. spi_waitMiso in reset()");
 	deselect();
+  //Serial.println("End last deselect() in reset()");
 }
 
 uint8_t CC1101::writeCommand(uint8_t command) 
