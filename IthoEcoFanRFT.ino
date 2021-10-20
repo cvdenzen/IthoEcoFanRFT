@@ -71,7 +71,7 @@ IthoPacket packet;
 
 const uint8_t RFTid[] = {11, 22, 33}; // my ID
 
-bool ITHOhasPacket = false;
+volatile bool ITHOhasPacket = false;
 IthoCommand RFTcommand[3] = {IthoUnknown, IthoUnknown, IthoUnknown};
 byte RFTRSSI[3] = {0, 0, 0};
 byte RFTcommandpos = 0;
@@ -255,16 +255,23 @@ void loop()
 void setupArjen(void) {
   //Serial.begin(115200);
   delay(500);
-  Serial.println("setupArjen begin");
+  //Serial.println("setupArjen begin");
   rf.setDeviceID(13, 123, 42); //DeviceID used to send commands, can also be changed on the fly for multi itho control
-  Serial.println("setupArjen rf.setDeviceID() done");
+  //Serial.println("setupArjen rf.setDeviceID() done");
   rf.init();
-  Serial.println("setupArjen rf.init() done");
+  //Serial.println("setupArjen rf.init() done");
   sendRegister();
   Serial.println("join command sent");
   pinMode(ITHO_IRQ_PIN, INPUT);
   pinMode(CC1101_SS,OUTPUT); // ??
-  attachInterrupt(ITHO_IRQ_PIN, ITHOcheck, FALLING);
+  //pinMode(A0,OUTPUT);
+  //pinMode(A1,OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(ITHO_IRQ_PIN), ITHOcheck, FALLING);
+
+  rf.sendCommand(IthoJoin);
+  delay(2000);
+
+  rf.sendCommand(IthoTimer1);
 }
 
 void loopArjen(void) {
@@ -304,12 +311,14 @@ void showPacket() {
   Serial.print(RFTcommand[1]);
   Serial.print(F(" "));
   Serial.print(RFTcommand[2]);
+  /* save memory
   Serial.print(F(" / Stored 3 RSSI's:     "));
   Serial.print(RFTRSSI[0]);
   Serial.print(F(" "));
   Serial.print(RFTRSSI[1]);
   Serial.print(F(" "));
   Serial.print(RFTRSSI[2]);
+  */
   Serial.print(F(" / Stored 3 ID checks: "));
   Serial.print(RFTidChk[0]);
   Serial.print(F(" "));
@@ -318,6 +327,7 @@ void showPacket() {
   Serial.print(RFTidChk[2]);
   Serial.print(F(" / Last ID: "));
   Serial.print(rf.getLastIDstr(false));
+  
 
   Serial.print(F(" / Command = "));
   //show command

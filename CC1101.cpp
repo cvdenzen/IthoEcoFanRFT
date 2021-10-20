@@ -22,10 +22,13 @@ CC1101::~CC1101()
 // SPI helper functions select() and deselect()
 inline void CC1101::select(void) {
 	digitalWrite(CC1101_SS, LOW);
+  //digitalWrite(A1,LOW);
+  delay(1);
 }
 
 inline void CC1101::deselect(void) {
 	digitalWrite(CC1101_SS, HIGH);
+  //digitalWrite(A1,HIGH);
 }
 
 
@@ -34,8 +37,11 @@ void CC1101::spi_waitMiso(unsigned long maxDurationMillis)
     unsigned long startMillis=millis();
     unsigned long maxMillis=startMillis+maxDurationMillis;
     while((digitalRead(MISO) == HIGH) && (millis()<maxMillis)) yield();
-    if (digitalRead(MISO) == HIGH) {
+    if (millis()>=maxMillis) {
       Serial.print("CC1101::spi_waitMiso timeout, timeout (milliseconds)=");Serial.println(maxDurationMillis);
+      //Serial.print(" ");Serial.print(startMillis);Serial.print(" ");Serial.print(maxMillis);Serial.print(" ");
+      //Serial.println(millis());
+      delay(1000);
     }
 }
 

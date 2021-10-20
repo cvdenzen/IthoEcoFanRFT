@@ -10,7 +10,7 @@
 #include <SPI.h>
 // On Arduino, SPI pins are predefined
 // But not always the right way
-#define CC1101_SS A0
+#define CC1101_SS 9
 /*	Type of transfers */
 #define CC1101_WRITE_BURST						0x40
 #define CC1101_READ_SINGLE						0x80

@@ -176,6 +176,8 @@ void IthoCC1101::initReceive()
     PA ramping      enabled
     Whitening     disabled
   */
+  
+  Serial.println("ithoCC1101::initReceive start");
   writeCommand(CC1101_SRES);
 
   writeRegister(CC1101_TEST0 , 0x09);
@@ -187,7 +189,16 @@ void IthoCC1101::initReceive()
   writeCommand(CC1101_SCAL);
 
   //wait for calibration to finish
-  while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE) yield();
+    unsigned long maxDurationMillis=10000; // max 10 seconds
+    unsigned long startMillis=millis();
+    unsigned long maxMillis=startMillis+maxDurationMillis;
+  while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE
+    && (millis()<maxMillis)) yield();
+    if (millis()>=maxMillis) {
+      Serial.print("CC1101::initReceive timeout, timeout (milliseconds)");Serial.println(maxDurationMillis);
+      //Serial.print("CC101_MARCSTATE=");Serial.println(readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER));
+    }
+  //Serial.println("ithoCC1101::initReceive after SCAL wait");
 
   writeRegister(CC1101_FSCAL2 , 0x00);
   writeRegister(CC1101_MCSM0 , 0x18);     //no auto calibrate
@@ -241,6 +252,8 @@ void IthoCC1101::initReceive()
   writeRegister(CC1101_IOCFG0 , 0x0D);      //Serial Data Output. Used for asynchronous serial mode.
 
   writeCommand(CC1101_SRX);
+
+  Serial.println("ithoCC1101::initReceive before while");
 
   while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX) yield();
 
