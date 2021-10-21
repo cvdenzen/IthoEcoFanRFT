@@ -108,6 +108,10 @@ static int16_t currentLevel = 0;  // Current dim level...
 MyMessage dimmerMsg(0, V_DIMMER);
 MyMessage lightMsg(0, V_LIGHT);
 
+MyMessage fanMsg(0,V_VAR1); // custom, from controller to mysensor to fan
+MyMessage fromCC1101(0,V_VAR1); // custom, from CC1101 to controller (openhab)
+MyMessage idFromCC1101(0,V_VAR2); // custom, first 3 id fields (to detect interfering itho remotes)
+
 
 void before()
 {
@@ -141,78 +145,29 @@ void presentation() {
   numSensors=1; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!numSensors = sensors.getDeviceCount();
 
-
-  present(7,S_DIMMER);
   // Present all sensors to controller
   for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {
      present(i+1, S_TEMP);
   }
+
+  present(7,S_DIMMER);
+  present(8,S_CUSTOM); // from controller to itho fan
+  present(9,S_CUSTOM); // from cc1101 receiver to controller (openhab)
+  present(10,S_CUSTOM); // id in packet from cc1101 receiver to controller
 }
 
-void loopxxx() {
-  //wdt_reset();
-  Serial.println("Start loop");
-  float temperature=37.9;
-  sensors.requestTemperatures(); // Send the command to get temperatures
-Serial.print("Temperature for Device 1 is: ");
-  temperature=sensors.getTempCByIndex(0); // Why "byIndex"? You can have more than one IC on the same bus. 0 refers to the first IC on the wire
-Serial.print(temperature);
-  send (msg.setSensor(0).set(temperature,1));
-  Serial.println("msg sent");
-  int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution());
-  //sleep(SLEEP_TIME);
-  wait(conversionTime);
-  wait(SLEEP_TIME,C_SET,V_PERCENTAGE);
-  Serial.println("End loop");
-  analogWrite(LED_PIN,(int)128);
-}
 void receive(const MyMessage &message) {
 
     Serial.print( "Message received" );
-  if (message.getType() == V_LIGHT || message.getType() == V_DIMMER || message.getType() == V_PERCENTAGE) {
+  if (message.getType() == V_VAR1) {
 
     //  Retrieve the power or dim level from the incoming request message
-    int requestedLevel = atoi( message.data );
+    int receivedIthoCommand = atoi( message.data );
+    Serial.print("Received command ");Serial.println(receivedIthoCommand);
 
-    // Adjust incoming level if this is a V_LIGHT variable update [0 == off, 1 == on]
-    requestedLevel *= ( message.getType() == V_LIGHT ? 100 : 1 );
-
-    // Clip incoming level to valid range of 0 to 100
-    requestedLevel = requestedLevel > 100 ? 100 : requestedLevel;
-    requestedLevel = requestedLevel < 0   ? 0   : requestedLevel;
-
-    #ifdef MY_DEBUG
-
-    Serial.print( "Changing level to " );
-    Serial.print( requestedLevel );
-    Serial.print( ", from " );
-    Serial.println( currentLevel );
-    #endif
-
-    fadeToLevel( requestedLevel );
-
-    // Inform the gateway of the current DimmableLED's SwitchPower1 and LoadLevelStatus value...
-    send(lightMsg.set(currentLevel > 0));
-
-    // hek comment: Is this really nessesary?
-    send( dimmerMsg.set(currentLevel) );
+    rf.sendCommand(receivedIthoCommand); // send to itho fan
   }
 }
-/***
- *  This method provides a graceful fade up/down effect
- */
-void fadeToLevel( int toLevel )
-{
-
-  int delta = ( toLevel - currentLevel ) < 0 ? -1 : 1;
-
-  while ( currentLevel != toLevel ) {
-    currentLevel += delta;
-    analogWrite( LED_PIN, (int)(currentLevel / 100. * 255) );
-    delay( FADE_DELAY );
-  }
-}
-static uint32_t last=0;
 void loop()
 {
   // Fetch temperatures from Dallas sensors
@@ -254,6 +209,8 @@ void loop()
 
 void setupArjen(void) {
   //Serial.begin(115200);
+  pinMode(ITHO_IRQ_PIN, INPUT);
+  pinMode(CC1101_SS,OUTPUT); // ??
   delay(500);
   //Serial.println("setupArjen begin");
   rf.setDeviceID(13, 123, 42); //DeviceID used to send commands, can also be changed on the fly for multi itho control
@@ -301,6 +258,7 @@ void showPacket() {
   if (goodpos != -1)  RFTlastCommand = RFTcommand[goodpos];
   else                RFTlastCommand = IthoUnknown;
   //show data
+  /* save memory
   Serial.print(F("RFT Current Pos: "));
   Serial.print(RFTcommandpos);
   Serial.print(F(", Good Pos: "));
@@ -311,14 +269,12 @@ void showPacket() {
   Serial.print(RFTcommand[1]);
   Serial.print(F(" "));
   Serial.print(RFTcommand[2]);
-  /* save memory
   Serial.print(F(" / Stored 3 RSSI's:     "));
   Serial.print(RFTRSSI[0]);
   Serial.print(F(" "));
   Serial.print(RFTRSSI[1]);
   Serial.print(F(" "));
   Serial.print(RFTRSSI[2]);
-  */
   Serial.print(F(" / Stored 3 ID checks: "));
   Serial.print(RFTidChk[0]);
   Serial.print(F(" "));
@@ -330,6 +286,7 @@ void showPacket() {
   
 
   Serial.print(F(" / Command = "));
+  */
   //show command
   switch (RFTlastCommand) {
     case IthoUnknown:
