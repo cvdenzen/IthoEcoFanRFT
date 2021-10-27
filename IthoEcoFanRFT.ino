@@ -104,9 +104,7 @@ bool receivedConfig = false;
 bool metric = true;
 // Initialize temperature message
 MyMessage msg(0,V_TEMP);
-static int16_t currentLevel = 0;  // Current dim level...
-MyMessage dimmerMsg(0, V_DIMMER);
-MyMessage lightMsg(0, V_LIGHT);
+static int16_t currentLevel = 0;  // Current dim level..
 
 MyMessage fanMsg(0,V_VAR1); // custom, from controller to mysensor to fan
 MyMessage fromCC1101(0,V_VAR1); // custom, from CC1101 to controller (openhab)
@@ -120,7 +118,7 @@ void before()
   // Startup up the OneWire library
   Serial.println("before(): between wdt_disable and sensors.begin");
   sensors.begin();
-  Serial.println("before(): after sensors.begin");
+  //Serial.println("before(): after sensors.begin");
   
 
 }
@@ -129,9 +127,6 @@ void setup()
 {
   setupArjen();
   // Pull the gateway's current dim level - restore light level upon node power-up
-  request( 0, V_DIMMER );
-  // requestTemperatures() will not block current thread
-  //sensors.setWaitForConversion(false);
   Serial.print("End setup for node number ");Serial.println(MY_NODE_ID);
 
 }
@@ -158,14 +153,35 @@ void presentation() {
 
 void receive(const MyMessage &message) {
 
-    Serial.print( "Message received" );
+  Serial.print( "Message received " );
   if (message.getType() == V_VAR1) {
 
     //  Retrieve the power or dim level from the incoming request message
     int receivedIthoCommand = atoi( message.data );
     Serial.print("Received command ");Serial.println(receivedIthoCommand);
 
-    rf.sendCommand(receivedIthoCommand); // send to itho fan
+  pinMode(ITHO_IRQ_PIN, INPUT);
+  pinMode(CC1101_SS,OUTPUT); // ??
+  attachInterrupt(digitalPinToInterrupt(ITHO_IRQ_PIN), ITHOcheck, FALLING);
+
+  delay(1000);
+  switch(receivedIthoCommand) {
+    
+    case 34: // low
+      rf.sendCommand(IthoLow);
+      break;
+    
+    case 35: // low
+      rf.sendCommand(IthoLow);
+      break;
+    case 41: // timer1
+      rf.sendCommand(IthoTimer1);
+      break;
+    default: // enum 0..12
+      rf.sendCommand(receivedIthoCommand);
+      break;
+  }
+  delay(1000);
   }
 }
 void loop()
@@ -217,18 +233,18 @@ void setupArjen(void) {
   //Serial.println("setupArjen rf.setDeviceID() done");
   rf.init();
   //Serial.println("setupArjen rf.init() done");
-  sendRegister();
-  Serial.println("join command sent");
+  //sendRegister();
+  //Serial.println("join command sent");
   pinMode(ITHO_IRQ_PIN, INPUT);
   pinMode(CC1101_SS,OUTPUT); // ??
-  //pinMode(A0,OUTPUT);
-  //pinMode(A1,OUTPUT);
   attachInterrupt(digitalPinToInterrupt(ITHO_IRQ_PIN), ITHOcheck, FALLING);
 
-  rf.sendCommand(IthoJoin);
+  //rf.sendCommand(IthoJoin);
+  //rf.sendCommand(IthoLow);
   delay(2000);
 
   rf.sendCommand(IthoTimer1);
+  delay(1000);
 }
 
 void loopArjen(void) {

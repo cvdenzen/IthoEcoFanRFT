@@ -174,7 +174,7 @@ class CC1101
 	
 		//spi
 		void spi_waitMiso();
-    void spi_waitMiso(unsigned long maxDurationMillis);
+        void spi_waitMiso(unsigned long maxDurationMillis);
 	
 		//cc1101
 		void init();

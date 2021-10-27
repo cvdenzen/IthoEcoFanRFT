@@ -21,13 +21,16 @@ CC1101::~CC1101()
 /***********************/
 // SPI helper functions select() and deselect()
 inline void CC1101::select(void) {
-	digitalWrite(CC1101_SS, LOW);
+  SPI.beginTransaction(SPISettings(1000000,MSBFIRST,SPI_MODE0));
+  digitalWrite(CC1101_SS, LOW);
+  spi_waitMiso();
   //digitalWrite(A1,LOW);
-  delay(1);
+  delay(10);
 }
 
 inline void CC1101::deselect(void) {
 	digitalWrite(CC1101_SS, HIGH);
+  SPI.endTransaction();
   //digitalWrite(A1,HIGH);
 }
 
@@ -66,11 +69,9 @@ void CC1101::reset()
 	delayMicroseconds(45);
 	select();
 
-	spi_waitMiso();
 	SPI.transfer(CC1101_SRES);
 	delay(10);
   //Serial.println("End SPI.transfer, delay in reset()");
-	spi_waitMiso();
   //Serial.println("End SPI.transfer.. spi_waitMiso in reset()");
 	deselect();
   //Serial.println("End last deselect() in reset()");
@@ -81,7 +82,6 @@ uint8_t CC1101::writeCommand(uint8_t command)
 	uint8_t result;
 	
 	select();
-	spi_waitMiso();
 	result = SPI.transfer(command);
 	deselect();
 	
@@ -91,7 +91,6 @@ uint8_t CC1101::writeCommand(uint8_t command)
 void CC1101::writeRegister(uint8_t address, uint8_t data) 
 {
 	select();
-	spi_waitMiso();
 	SPI.transfer(address);
 	SPI.transfer(data);
 	deselect();
@@ -102,7 +101,6 @@ uint8_t CC1101::readRegister(uint8_t address)
 	uint8_t val;
   
 	select();
-	spi_waitMiso();
 	SPI.transfer(address);
 	val = SPI.transfer(0);
 	deselect();
@@ -115,7 +113,6 @@ uint8_t CC1101::readRegisterMedian3(uint8_t address)
   uint8_t val, val1, val2, val3;
 
   select();
-  spi_waitMiso();
   SPI.transfer(address);
   val1 = SPI.transfer(0);
   SPI.transfer(address);
@@ -176,7 +173,6 @@ void CC1101::writeBurstRegister(uint8_t address, uint8_t* data, uint8_t length)
 	uint8_t i;
 
 	select();
-	spi_waitMiso();
 	SPI.transfer(address | CC1101_WRITE_BURST);
 	for (i = 0; i < length; i++) {
 		SPI.transfer(data[i]);
@@ -189,7 +185,6 @@ void CC1101::readBurstRegister(uint8_t* buffer, uint8_t address, uint8_t length)
 	uint8_t i;
 	
 	select();
-	spi_waitMiso();
 	SPI.transfer(address | CC1101_READ_BURST);
 	
 	for (i = 0; i < length; i++) {
