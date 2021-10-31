@@ -195,7 +195,7 @@ void IthoCC1101::initReceive()
   while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE
     && (millis()<maxMillis)) yield();
     if (millis()>=maxMillis) {
-      Serial.print("CC1101::initReceive timeout, timeout (milliseconds)");Serial.println(maxDurationMillis);
+      Serial.print("CC1101::initReceive calibration timeout, timeout (milliseconds)");Serial.println(maxDurationMillis);
       //Serial.print("CC101_MARCSTATE=");Serial.println(readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER));
     }
   //Serial.println("ithoCC1101::initReceive after SCAL wait");
@@ -241,7 +241,15 @@ void IthoCC1101::initReceive()
   writeCommand(CC1101_SCAL);
 
   //wait for calibration to finish
-  while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE) yield();
+    maxDurationMillis=10000; // max 10 seconds
+    startMillis=millis();
+    maxMillis=startMillis+maxDurationMillis;
+  while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE
+      && (millis()<maxMillis)) yield();
+  if (millis()>=maxMillis) {
+      Serial.print("CC1101::initReceive calibration2 timeout, timeout (milliseconds)");Serial.println(maxDurationMillis);
+      //Serial.print("CC101_MARCSTATE=");Serial.println(readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER));
+  }
 
   writeRegister(CC1101_MCSM0 , 0x18);     //no auto calibrate
 
@@ -255,7 +263,16 @@ void IthoCC1101::initReceive()
 
   Serial.println("ithoCC1101::initReceive before while");
 
-  while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX) yield();
+  // Wait for status is "receive"
+    maxDurationMillis=10000; // max 10 seconds
+    startMillis=millis();
+    maxMillis=startMillis+maxDurationMillis;
+  while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX
+      && (millis()<maxMillis)) yield(); yield();
+  if (millis()>=maxMillis) {
+      Serial.print("CC1101::initReceive wait for MARCSTATE_RX timeout, timeout (milliseconds)");Serial.println(maxDurationMillis);
+      //Serial.print("CC101_MARCSTATE=");Serial.println(readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER));
+  }
 
   initReceiveMessage();
 }
@@ -284,10 +301,18 @@ void  IthoCC1101::initReceiveMessage()
   writeCommand(CC1101_SRX); //switch to RX state
 
   // Check that the RX state has been entered
-  while (((marcState = readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) & CC1101_BITS_MARCSTATE) != CC1101_MARCSTATE_RX)
+    maxDurationMillis=10000; // max 10 seconds
+    startMillis=millis();
+    maxMillis=startMillis+maxDurationMillis;
+  while (((marcState = readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) & CC1101_BITS_MARCSTATE) != CC1101_MARCSTATE_RX
+      && (millis()<maxMillis)) yield();
   {
     if (marcState == CC1101_MARCSTATE_RXFIFO_OVERFLOW) // RX_OVERFLOW
       writeCommand(CC1101_SFRX); //flush RX buffer
+  }
+  if (millis()>=maxMillis) {
+      Serial.print("CC1101::initReceiveMessage wait for MARCSTATE_RX timeout, timeout (milliseconds)");Serial.println(maxDurationMillis);
+      //Serial.print("CC101_MARCSTATE=");Serial.println(readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER));
   }
 }
 

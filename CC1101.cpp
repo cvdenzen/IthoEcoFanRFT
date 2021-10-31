@@ -283,10 +283,17 @@ void CC1101::sendData(CC1101Packet *packet)
 	}
 
 	//wait until transmission is finished (TXOFF_MODE is expected to be set to 0/IDLE or TXFIFO_UNDERFLOW)
+    unsigned long maxDurationMillis=10000; // max 10 seconds
+    unsigned long startMillis=millis();
+    unsigned long maxMillis=startMillis+maxDurationMillis;
 	do
 	{
 		MarcState = (readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE);
 //		if (MarcState == CC1101_MARCSTATE_TXFIFO_UNDERFLOW) Serial.print(F("TXFIFO_UNDERFLOW occured in sendData() \n"));
+        if (millis()>=maxMillis) {
+            Serial.print("CC1101::sendData, timeout MARCSTATE_IDLE, _TXFIFO_UNDERLOW (milliseconds) ");Serial.println(maxDurationMillis);
+        }
 	}
-  	while((MarcState != CC1101_MARCSTATE_IDLE) && (MarcState != CC1101_MARCSTATE_TXFIFO_UNDERFLOW));
+    while((MarcState != CC1101_MARCSTATE_IDLE) && (MarcState != CC1101_MARCSTATE_TXFIFO_UNDERFLOW)
+      && (millis()<maxMillis));
 }

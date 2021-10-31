@@ -250,6 +250,7 @@ void setupArjen(void) {
 void loopArjen(void) {
   // do whatever you want, check (and reset) the ITHOhasPacket flag whenever you like
   if (ITHOhasPacket) {
+    ITHOhasPacket = false;
     if (rf.checkForNewPacket()) {
       IthoCommand cmd = rf.getLastCommand();
       if (++RFTcommandpos > 2) RFTcommandpos = 0;  // store information in next entry of ringbuffers
@@ -269,7 +270,6 @@ void loopArjen(void) {
 }
 
 void showPacket() {
-  ITHOhasPacket = false;
   uint8_t goodpos = findRFTlastCommand();
   if (goodpos != -1)  RFTlastCommand = RFTcommand[goodpos];
   else                RFTlastCommand = IthoUnknown;
