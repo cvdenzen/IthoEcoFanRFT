@@ -153,7 +153,7 @@ void presentation() {
 
 void receive(const MyMessage &message) {
 
-  Serial.print( "Message received " );
+  Serial.print( "Message received " );Serial.println(atoi( message.data ));
   if (message.getType() == V_VAR1) {
 
     //  Retrieve the power or dim level from the incoming request message

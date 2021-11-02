@@ -1,7 +1,9 @@
 /*
- * Author: Klusjesman, modified bij supersjimmie for Arduino/ESP8266
+ * Author: Klusjesman, modified bij supersjimmie for Arduino/ESP8266, modified by Carl van Denzen
  */
 
+ // CC1101_REPORT_TIMEOUTS uses dynamic memory
+//#define CC1101_REPORT_TIMEOUTS
 #include "CC1101.h"
 
 // default constructor
@@ -40,12 +42,14 @@ void CC1101::spi_waitMiso(unsigned long maxDurationMillis)
     unsigned long startMillis=millis();
     unsigned long maxMillis=startMillis+maxDurationMillis;
     while((digitalRead(MISO) == HIGH) && (millis()<maxMillis)) yield();
+#ifdef CC1101_REPORT_TIMEOUTS
     if (millis()>=maxMillis) {
-      Serial.print("CC1101::spi_waitMiso timeout, timeout (milliseconds)=");Serial.println(maxDurationMillis);
+      Serial.print(F("CC1101::spi_waitMiso timeout, timeout (milliseconds)="));Serial.println(maxDurationMillis);
       //Serial.print(" ");Serial.print(startMillis);Serial.print(" ");Serial.print(maxMillis);Serial.print(" ");
       //Serial.println(millis());
       delay(1000);
     }
+#endif
 }
 
 void CC1101::spi_waitMiso()
@@ -71,8 +75,6 @@ void CC1101::reset()
 
 	SPI.transfer(CC1101_SRES);
 	delay(10);
-  //Serial.println("End SPI.transfer, delay in reset()");
-  //Serial.println("End SPI.transfer.. spi_waitMiso in reset()");
 	deselect();
   //Serial.println("End last deselect() in reset()");
 }
@@ -290,9 +292,11 @@ void CC1101::sendData(CC1101Packet *packet)
 	{
 		MarcState = (readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE);
 //		if (MarcState == CC1101_MARCSTATE_TXFIFO_UNDERFLOW) Serial.print(F("TXFIFO_UNDERFLOW occured in sendData() \n"));
+#ifdef CC1101_REPORT_TIMEOUTS
         if (millis()>=maxMillis) {
-            Serial.print("CC1101::sendData, timeout MARCSTATE_IDLE, _TXFIFO_UNDERLOW (milliseconds) ");Serial.println(maxDurationMillis);
+            Serial.print(F("CC1101::sendData, timeout MARCSTATE_IDLE, _TXFIFO_UNDERLOW (milliseconds) "));Serial.println(maxDurationMillis);
         }
+#endif
 	}
     while((MarcState != CC1101_MARCSTATE_IDLE) && (MarcState != CC1101_MARCSTATE_TXFIFO_UNDERFLOW)
       && (millis()<maxMillis));
