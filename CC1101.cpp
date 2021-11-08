@@ -2,8 +2,7 @@
  * Author: Klusjesman, modified bij supersjimmie for Arduino/ESP8266, modified by Carl van Denzen
  */
 
- // CC1101_REPORT_TIMEOUTS uses dynamic memory
-//#define CC1101_REPORT_TIMEOUTS
+#define CC1101_REPORT_TIMEOUTS
 #include "CC1101.h"
 
 // default constructor
@@ -33,6 +32,7 @@ inline void CC1101::select(void) {
 inline void CC1101::deselect(void) {
 	digitalWrite(CC1101_SS, HIGH);
   SPI.endTransaction();
+  delay(10);
   //digitalWrite(A1,HIGH);
 }
 

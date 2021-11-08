@@ -28,6 +28,7 @@
 
 // Enable debug prints to serial monitor
 #define MY_DEBUG
+//#undef MY_DEBUG
 #define MY_BAUD_RATE 38400
 
 
@@ -99,6 +100,7 @@ unsigned long SLEEP_TIME = 3000; // Sleep time between reads (in milliseconds)
 OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 DallasTemperature sensors(&oneWire); // Pass the oneWire reference to Dallas Temperature.
 float lastTemperature[MAX_ATTACHED_DS18B20];
+unsigned long lastTemperatureUpdateMillis[MAX_ATTACHED_DS18B20];
 int numSensors=0;
 bool receivedConfig = false;
 bool metric = true;
@@ -126,7 +128,10 @@ void before()
 void setup()
 {
   setupArjen();
-  // Pull the gateway's current dim level - restore light level upon node power-up
+  for (int i=0;i<MAX_ATTACHED_DS18B20;i++) {
+    lastTemperatureUpdateMillis[i]=0;
+    lastTemperature[i]=0.0;
+  }
   Serial.print("End setup for node number ");Serial.println(MY_NODE_ID);
 
 }
@@ -164,7 +169,6 @@ void receive(const MyMessage &message) {
   pinMode(CC1101_SS,OUTPUT); // ??
   attachInterrupt(digitalPinToInterrupt(ITHO_IRQ_PIN), ITHOcheck, FALLING);
 
-  delay(1000);
   switch(receivedIthoCommand) {
     
     case 34: // low
@@ -181,7 +185,6 @@ void receive(const MyMessage &message) {
       rf.sendCommand(receivedIthoCommand);
       break;
   }
-  delay(1000);
   }
 }
 void loop()
@@ -202,23 +205,28 @@ void loop()
     float temperature = static_cast<float>(static_cast<int>((getControllerConfig().isMetric?sensors.getTempCByIndex(i):sensors.getTempFByIndex(i)) * 10.)) / 10.;
 
     // Only send data if temperature has changed and no error
+    if (temperature != -127.00 && temperature != 85.00
     #if COMPARE_TEMP == 1
-    if (lastTemperature[i] != temperature && temperature != -127.00 && temperature != 85.00) {
-    #else
-    if (temperature != -127.00 && temperature != 85.00) {
+        && lastTemperature[i] != temperature
     #endif
-       // Send in the new temperature with 1 decimal
-      send(msg.setSensor(i).set(temperature,1),false);
-      // Save new temperatures for next compare
-      lastTemperature[i]=temperature;
+       ) {
+      // Do not send too often
+      float tempDiff=temperature-lastTemperature[i]; // to suit the abs macro
+      if ( ( (millis()-lastTemperatureUpdateMillis[i])>60000)
+          ||(abs(tempDiff)>3.0)) {
+        // Send in the new temperature with 1 decimal
+        send(msg.setSensor(i).set(temperature,1),false);
+        // Save new temperatures for next compare
+        lastTemperature[i]=temperature;
+        lastTemperatureUpdateMillis[i]=millis();
+      }
     }
-  }
+  } // for int i=0..
 
   loopArjen();
-  
-  
+
   // sleep with time is difficult
-  delay(SLEEP_TIME);
+  wait(SLEEP_TIME);
 }
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Start ArjenHiemstra Itho
@@ -306,28 +314,28 @@ void showPacket() {
   //show command
   switch (RFTlastCommand) {
     case IthoUnknown:
-      Serial.print("unknown\n");
+      Serial.print(F("unknown\n"));
       break;
     case IthoLow:
-      Serial.print("low\n");
+      Serial.print(F("low\n"));
       break;
     case IthoMedium:
-      Serial.print("medium\n");
+      Serial.print(F("medium\n"));
       break;
     case IthoHigh:
-      Serial.print("high\n");
+      Serial.print(F("high\n"));
       break;
     case IthoFull:
-      Serial.print("full\n");
+      Serial.print(F("full\n"));
       break;
     case IthoTimer1:
-      Serial.print("timer1\n");
+      Serial.print(F("timer1\n"));
       break;
     case IthoTimer2:
-      Serial.print("timer2\n");
+      Serial.print(F("timer2\n"));
       break;
     case IthoTimer3:
-      Serial.print("timer3\n");
+      Serial.print(F("timer3\n"));
       break;
     case IthoJoin:
       Serial.print("join\n");
@@ -350,45 +358,45 @@ uint8_t findRFTlastCommand() {
 }
 
 void sendRegister() {
-  Serial.println("sending join...");
+  Serial.println(F("sending join..."));
   rf.sendCommand(IthoJoin);
-  Serial.println("sending join done.");
+  Serial.println(F("sending join done."));
 }
 
 void sendStandbySpeed() {
-  Serial.println("sending standby...");
+  Serial.println(F("sending standby..."));
   rf.sendCommand(IthoStandby);
-  Serial.println("sending standby done.");
+  Serial.println(F("sending standby done."));
 }
 
 void sendLowSpeed() {
-  Serial.println("sending low...");
+  Serial.println(F("sending low..."));
   rf.sendCommand(IthoLow);
-  Serial.println("sending low done.");
+  Serial.println(F("sending low done."));
 }
 
 void sendMediumSpeed() {
-  Serial.println("sending medium...");
+  Serial.println(F("sending medium..."));
   rf.sendCommand(IthoMedium);
-  Serial.println("sending medium done.");
+  Serial.println(F("sending medium done."));
 }
 
 void sendHighSpeed() {
-  Serial.println("sending high...");
+  Serial.println(F("sending high..."));
   rf.sendCommand(IthoHigh);
-  Serial.println("sending high done.");
+  Serial.println(F("sending high done."));
 }
 
 void sendFullSpeed() {
-  Serial.println("sending FullSpeed...");
+  Serial.println(F("sending FullSpeed..."));
   rf.sendCommand(IthoFull);
-  Serial.println("sending FullSpeed done.");
+  Serial.println(F("sending FullSpeed done."));
 }
 
 void sendTimer() {
-  Serial.println("sending timer...");
+  Serial.println(F("sending timer..."));
   rf.sendCommand(IthoTimer1);
-  Serial.println("sending timer done.");
+  Serial.println(F("sending timer done."));
 }
 
   // End of ArjenHiemstra's IthoEcoFan
