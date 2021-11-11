@@ -295,7 +295,7 @@ void CC1101::sendData(CC1101Packet *packet)
 
 	}
     while((MarcState != CC1101_MARCSTATE_IDLE) && (MarcState != CC1101_MARCSTATE_TXFIFO_UNDERFLOW)
-      && (millis()<maxMillis)) yield();
+      && (millis()<maxMillis));
 #ifdef CC1101_REPORT_TIMEOUTS
         if (millis()>=maxMillis) {
             Serial.print(F("CC1101::sendData, timeout MARCSTATE_IDLE, _TXFIFO_UNDERLOW (milliseconds) "));Serial.println(maxDurationMillis);
