@@ -2,8 +2,7 @@
  * Author: Klusjesman, supersjimmie, modified and reworked by arjenhiemstra 
  */
 
-#ifndef __ITHOCC1101_H__
-#define __ITHOCC1101_H__
+#pragma once
 
 #include <stdio.h>
 #include "CC1101.h"
@@ -15,13 +14,13 @@ const uint8_t ithoPaTableSend[8] = {0x6F, 0x26, 0x2E, 0x8C, 0x87, 0xCD, 0xC7, 0x
 const uint8_t ithoPaTableReceive[8] = {0x6F, 0x26, 0x2E, 0x7F, 0x8A, 0x84, 0xCA, 0xC4};
 
 //message command bytes
-const uint8_t ithoMessageRVHighCommandBytes[] =   {49,224,4,0,0,200};
+const uint8_t ithoMessageRVHighCommandBytes[] =   {49, 224, 4, 0, 0, 200, 0};
 const uint8_t ithoMessageHighCommandBytes[] =     {34,241,3,0,4,4};
 const uint8_t ithoMessageFullCommandBytes[] =     {34,241,3,0,4,4};
 const uint8_t ithoMessageMediumCommandBytes[] =   {34,241,3,0,3,4};
 const uint8_t ithoMessageRVMediumCommandBytes[] = {34,241,3,0,3,7};
 const uint8_t ithoMessageLowCommandBytes[] =      {34,241,3,0,2,4};
-const uint8_t ithoMessageRVLowCommandBytes[] =    {49,224,4,0,0,1};
+const uint8_t ithoMessageRVLowCommandBytes[] =    {49, 224, 4, 0, 0, 1, 0};
 const uint8_t ithoMessageRVAutoCommandBytes[] =   {34,241,3,0,5,7};
 const uint8_t ithoMessageStandByCommandBytes[] =  {0,0,0,0,0,0};         //unkown, tbd
 const uint8_t ithoMessageTimer1CommandBytes[] =   {34,243,3,0,0,10};     //10 minutes full speed
@@ -112,5 +111,3 @@ class IthoCC1101 : protected CC1101
     
 
 }; //IthoCC1101
-
-#endif //__ITHOCC1101_H__

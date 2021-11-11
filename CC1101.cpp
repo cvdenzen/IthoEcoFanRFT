@@ -292,12 +292,13 @@ void CC1101::sendData(CC1101Packet *packet)
 	{
 		MarcState = (readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE);
 //		if (MarcState == CC1101_MARCSTATE_TXFIFO_UNDERFLOW) Serial.print(F("TXFIFO_UNDERFLOW occured in sendData() \n"));
+
+	}
+    while((MarcState != CC1101_MARCSTATE_IDLE) && (MarcState != CC1101_MARCSTATE_TXFIFO_UNDERFLOW)
+      && (millis()<maxMillis)) yield();
 #ifdef CC1101_REPORT_TIMEOUTS
         if (millis()>=maxMillis) {
             Serial.print(F("CC1101::sendData, timeout MARCSTATE_IDLE, _TXFIFO_UNDERLOW (milliseconds) "));Serial.println(maxDurationMillis);
         }
 #endif
 	}
-    while((MarcState != CC1101_MARCSTATE_IDLE) && (MarcState != CC1101_MARCSTATE_TXFIFO_UNDERFLOW)
-      && (millis()<maxMillis));
-}

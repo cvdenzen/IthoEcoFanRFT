@@ -2,8 +2,7 @@
  * Author: Klusjesman, supersjimmie, modified and reworked by arjenhiemstra 
  */
 
-#ifndef ITHOPACKET_H_
-#define ITHOPACKET_H_
+#pragma once
 
 enum IthoCommand
 {    
@@ -22,11 +21,28 @@ enum IthoCommand
   IthoTimer2 = 9,
   IthoTimer3 = 10,
   
-  //duco c system remote
-  DucoStandby = 11,
-  DucoLow = 12,
-  DucoMedium = 13,
-  DucoHigh = 14
+  //  //duco c system remote
+  //  DucoStandby = 11,
+  //  DucoLow = 12,
+  //  DucoMedium = 13,
+  //  DucoHigh = 14
+};
+
+enum message_state {
+  S_START,
+  S_HEADER,
+  S_ADDR0,
+  S_ADDR1,
+  S_ADDR2,
+  S_PARAM0,
+  S_PARAM1,
+  S_OPCODE,
+  S_LEN,
+  S_PAYLOAD,
+  S_CHECKSUM,
+  S_TRAILER,
+  S_COMPLETE,
+  S_ERROR
 };
 
 
@@ -44,6 +60,3 @@ class IthoPacket
     
     uint8_t counter;    //0-255, counter is increased on every remote button press
 };
-
-
-#endif /* ITHOPACKET_H_ */

@@ -211,17 +211,17 @@ void IthoCC1101::initReceive()
   writeRegister(CC1101_FREQ0 , 0x6A);
   writeRegister(CC1101_IOCFG0 , 0x2E);      //High impedance (3-state)
   writeRegister(CC1101_IOCFG2 , 0x06);      //0x06 Assert when sync word has been sent / received, and de-asserts at the end of the packet.
-  writeRegister(CC1101_FSCTRL1 , 0x06);
+  writeRegister(CC1101_FSCTRL1 , 0x0F); //change 06
   writeRegister(CC1101_FSCTRL0 , 0x00);
-  writeRegister(CC1101_MDMCFG4 , 0x5A);
+  writeRegister(CC1101_MDMCFG4 , 0x6A);
   writeRegister(CC1101_MDMCFG3 , 0x83);
-  writeRegister(CC1101_MDMCFG2 , 0x00);   //Enable digital DC blocking filter before demodulator, 2-FSK, Disable Manchester encoding/decoding, No preamble/sync
+  writeRegister(CC1101_MDMCFG2 , 0x10);   //Enable digital DC blocking filter before demodulator, 2-FSK, Disable Manchester encoding/decoding, No preamble/sync
   writeRegister(CC1101_MDMCFG1 , 0x22);   //Disable FEC
   writeRegister(CC1101_MDMCFG0 , 0xF8);
   writeRegister(CC1101_CHANNR , 0x00);
   writeRegister(CC1101_DEVIATN , 0x50);
   writeRegister(CC1101_FREND1 , 0x56);
-  writeRegister(CC1101_FREND0 , 0x17);
+  writeRegister(CC1101_FREND0 , 0x10);
   writeRegister(CC1101_MCSM0 , 0x18);     //no auto calibrate
   writeRegister(CC1101_FOCCFG , 0x16);
   writeRegister(CC1101_BSCFG , 0x6C);
@@ -229,18 +229,18 @@ void IthoCC1101::initReceive()
   writeRegister(CC1101_AGCCTRL1 , 0x40);
   writeRegister(CC1101_AGCCTRL0 , 0x91);
   writeRegister(CC1101_FSCAL3 , 0xE9);
-  writeRegister(CC1101_FSCAL2 , 0x2A);
+  writeRegister(CC1101_FSCAL2 , 0x21);
   writeRegister(CC1101_FSCAL1 , 0x00);
-  writeRegister(CC1101_FSCAL0 , 0x11);
+  writeRegister(CC1101_FSCAL0 , 0x1F);
   writeRegister(CC1101_FSTEST , 0x59);
   writeRegister(CC1101_TEST2 , 0x81);
   writeRegister(CC1101_TEST1 , 0x35);
-  writeRegister(CC1101_TEST0 , 0x0B);
+  writeRegister(CC1101_TEST0 , 0x09);
   writeRegister(CC1101_PKTCTRL1 , 0x04);    //No address check, Append two bytes with status RSSI/LQI/CRC OK,
   writeRegister(CC1101_PKTCTRL0 , 0x32);    //Infinite packet length mode, CRC disabled for TX and RX, No data whitening, Asynchronous serial mode, Data in on GDO0 and data out on either of the GDOx pins
   writeRegister(CC1101_ADDR , 0x00);
   writeRegister(CC1101_PKTLEN , 0xFF);
-  writeRegister(CC1101_TEST0 , 0x09);
+
 
   writeCommand(CC1101_SCAL);
 
@@ -292,7 +292,7 @@ void  IthoCC1101::initReceiveMessage()
   writeCommand(CC1101_SIDLE); //idle
 
   //set datarate
-  writeRegister(CC1101_MDMCFG4 , 0x5A); // set kBaud
+  writeRegister(CC1101_MDMCFG4 , 0x6A); // set kBaud
   writeRegister(CC1101_MDMCFG3 , 0x83); // set kBaud
   writeRegister(CC1101_DEVIATN , 0x50);
 
@@ -300,7 +300,7 @@ void  IthoCC1101::initReceiveMessage()
   writeRegister(CC1101_PKTLEN , 63);      //63 bytes message (sync at beginning of message is removed by CC1101)
 
   //set fifo mode with fixed packet length and sync bytes
-  writeRegister(CC1101_PKTCTRL0 , 0x00);
+  writeRegister(CC1101_PKTCTRL0 , 0x02);
   writeRegister(CC1101_SYNC1 , SYNC1);
   writeRegister(CC1101_SYNC0 , SYNC0);
   writeRegister(CC1101_MDMCFG2 , MDMCFG2);
