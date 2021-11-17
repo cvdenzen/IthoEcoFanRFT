@@ -57,6 +57,10 @@
 #define MY_NODE_ID 156
 
 #include <MySensors.h>
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#include <ArduinoQueue.h>
+ArduinoQueue<int> cc1101commandQueue(6);
+unsigned long lastCommandDateTime=0;
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Start ArjenHiemstra IthoEcoFan
@@ -118,7 +122,9 @@ void before()
   wdt_disable();
   pinMode(LED_PIN,OUTPUT);
   // Startup up the OneWire library
-  Serial.println("before(): between wdt_disable and sensors.begin");
+#ifdef MY_DEBUG
+  Serial.println(F("before(): between wdt_disable and sensors.begin"));
+#endif
   sensors.begin();
   //Serial.println("before(): after sensors.begin");
   
@@ -132,8 +138,9 @@ void setup()
     lastTemperatureUpdateMillis[i]=0;
     lastTemperature[i]=0.0;
   }
-  Serial.print("End setup for node number ");Serial.println(MY_NODE_ID);
-
+#ifdef MY_DEBUG
+  Serial.print(F("End setup for node number "));Serial.println(MY_NODE_ID);
+#endif
 }
 
 void presentation() {
@@ -158,33 +165,21 @@ void presentation() {
 
 void receive(const MyMessage &message) {
 
-  Serial.print( "Message received " );Serial.println(atoi( message.data ));
+#ifdef MY_DEBUG
+  Serial.print( F("Message received ") );Serial.println(atoi( message.data ));
+#endif
   if (message.getType() == V_VAR1) {
 
-    //  Retrieve the power or dim level from the incoming request message
+    //  Retrieve from the incoming message
     int receivedIthoCommand = atoi( message.data );
-    Serial.print("Received command ");Serial.println(receivedIthoCommand);
-
-  pinMode(ITHO_IRQ_PIN, INPUT);
-  pinMode(CC1101_SS,OUTPUT); // ??
-  attachInterrupt(digitalPinToInterrupt(ITHO_IRQ_PIN), ITHOcheck, FALLING);
-
-  switch(receivedIthoCommand) {
-    
-    case 34: // low
-      rf.sendCommand(IthoLow);
-      break;
-    
-    case 35: // low
-      rf.sendCommand(IthoLow);
-      break;
-    case 41: // timer1
-      rf.sendCommand(IthoTimer1);
-      break;
-    default: // enum 0..12
-      rf.sendCommand(receivedIthoCommand);
-      break;
-  }
+    noInterrupts();
+    // Enqueue the command a few times, so it will be sent multiple times.
+    // We do not want the send to be done in the receive function, that would block
+    // the receive ?
+    for (int i=0;i<2;i++) {
+      cc1101commandQueue.enqueue(receivedIthoCommand);
+    }
+    interrupts();
   }
 }
 void loop()
@@ -251,8 +246,8 @@ void setupArjen(void) {
   //rf.sendCommand(IthoLow);
   delay(2000);
 
-  rf.sendCommand(IthoTimer1);
-  delay(1000);
+  //rf.sendCommand(IthoTimer1);
+  //delay(1000);
 }
 
 void loopArjen(void) {
@@ -270,6 +265,25 @@ void loopArjen(void) {
         showPacket();
       }
     }
+  }
+  int receivedIthoCommand;
+  noInterrupts();
+  if (!cc1101commandQueue.isEmpty() && ((millis()-lastCommandDateTime)>10000)) {
+    receivedIthoCommand=cc1101commandQueue.dequeue();
+    interrupts();
+    pinMode(ITHO_IRQ_PIN, INPUT);
+    pinMode(CC1101_SS,OUTPUT); // ??
+    attachInterrupt(digitalPinToInterrupt(ITHO_IRQ_PIN), ITHOcheck, FALLING);
+    // Send x times
+#ifdef MY_DEBUG
+    Serial.print(F("Sending queued command to cc1101: "));Serial.println(receivedIthoCommand);
+#endif
+    for (int i=0;i<1;i++) {
+      rf.sendCommand(receivedIthoCommand);
+    }
+    lastCommandDateTime=millis();
+  } else {
+      interrupts();
   }
 }
 
@@ -312,6 +326,8 @@ void showPacket() {
   Serial.print(F(" / Command = "));
   */
   //show command
+#ifdef MY_DEBUG
+  Serial.print(F("Received command on CC1101 receiver: "));
   switch (RFTlastCommand) {
     case IthoUnknown:
       Serial.print(F("unknown\n"));
@@ -344,6 +360,7 @@ void showPacket() {
       Serial.print("leave\n");
       break;
   }
+#endif
 }
 
 uint8_t findRFTlastCommand() {
