@@ -98,7 +98,7 @@ bool RFTidChk[3] = {false, false, false};
 #define LED_PIN LED_BUILTIN
 #define FADE_DELAY 10  // Delay in ms for each percentage fade up/down (10ms = 1s full-range dim)
 
-unsigned long SLEEP_TIME = 3000; // Sleep time between reads (in milliseconds)
+unsigned long SLEEP_TIME = 200; // Sleep time between reads (in milliseconds)
 
 
 OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
@@ -176,7 +176,7 @@ void receive(const MyMessage &message) {
     // Enqueue the command a few times, so it will be sent multiple times.
     // We do not want the send to be done in the receive function, that would block
     // the receive ?
-    for (int i=0;i<2;i++) {
+    for (int i=0;i<1;i++) {
       cc1101commandQueue.enqueue(receivedIthoCommand);
     }
     interrupts();
@@ -208,7 +208,7 @@ void loop()
       // Do not send too often
       float tempDiff=temperature-lastTemperature[i]; // to suit the abs macro
       if ( ( (millis()-lastTemperatureUpdateMillis[i])>60000)
-          ||(abs(tempDiff)>3.0)) {
+          ||(abs(tempDiff)>2.0)) {
         // Send in the new temperature with 1 decimal
         send(msg.setSensor(i).set(temperature,1),false);
         // Save new temperatures for next compare
@@ -220,7 +220,6 @@ void loop()
 
   loopArjen();
 
-  // sleep with time is difficult
   wait(SLEEP_TIME);
 }
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -268,7 +267,7 @@ void loopArjen(void) {
   }
   int receivedIthoCommand;
   noInterrupts();
-  if (!cc1101commandQueue.isEmpty() && ((millis()-lastCommandDateTime)>10000)) {
+  if (!cc1101commandQueue.isEmpty() && ((millis()-lastCommandDateTime)>1000)) {
     receivedIthoCommand=cc1101commandQueue.dequeue();
     interrupts();
     pinMode(ITHO_IRQ_PIN, INPUT);
@@ -354,10 +353,10 @@ void showPacket() {
       Serial.print(F("timer3\n"));
       break;
     case IthoJoin:
-      Serial.print("join\n");
+      Serial.print(F("join\n"));
       break;
     case IthoLeave:
-      Serial.print("leave\n");
+      Serial.print(F("leave\n"));
       break;
   }
 #endif
