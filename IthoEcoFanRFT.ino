@@ -76,8 +76,14 @@ unsigned long lastCommandDateTime=0;
 #define ONE_WIRE_BUS 8 // Pin where dallas sensor is connected
 #define MAX_ATTACHED_DS18B20 8
 
+#include <EEPROM.h>
+#ifndef EEPROM_LOCAL_CONFIG_ADDRESS
+#define EEPROM_START (700)
+#else
+#define EEPROM_START (EEPROM_LOCAL_CONFIG_ADDRESS)
+#endif
 // To make the index constant, use this initialiser
-const DeviceAddress deviceAddressesKnown[]= {
+const DeviceAddress knownDeviceAddresses[]= {
   {0x28, 0x38, 0xC0, 0x1F, 0x0E, 0x00, 0x00, 0x26},
   {0x28, 0xB6, 0xC6, 0x1E, 0x0E, 0x00, 0x00, 0xCC},
   {0x28, 0x83, 0x91, 0x1F, 0x0E, 0x00, 0x00, 0x81},
@@ -146,6 +152,7 @@ while (!Serial) ;
     Serial.println(F("Copied from .. to:"));printDeviceAddress(deviceAddress);printDeviceAddress(deviceAddresses[i]);Serial.println(F("Finished copy"));
     i++;
   }
+  copyKnownDeviceAddressesToEEPROM();
   sensors.requestTemperatures();
   int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution());
   Serial.print( F(", conversionTime=") );Serial.println(conversionTime);
@@ -218,6 +225,19 @@ void loop()
   #endif
 }
 
+void copyKnownDeviceAddressesToEEPROM() {
+  // put, only updated data, into rom from first free address from mysensors
+  EEPROM.put(EEPROM_START,knownDeviceAddresses);
+  #ifdef MY_DEBUG
+  for (uint8_t i=0;i<(sizeof(knownDeviceAddresses)/sizeof(knownDeviceAddresses[0]));i++) {
+    Serial.print("copyKnownDeviceAddressesToEEPROM, i=");Serial.println(i);
+    // Print the address to EEPROM
+    DeviceAddress da;
+    EEPROM.get(EEPROM_START+i*sizeof(DeviceAddress),da);
+    printDeviceAddress(da);
+  }
+  #endif
+}
 
 #ifdef MY_DEBUG
 void printDeviceAddress(DeviceAddress deviceAddress)
