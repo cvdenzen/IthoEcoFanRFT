@@ -74,9 +74,10 @@ unsigned long lastCommandDateTime=0;
 #define COMPARE_TEMP 1 // Send temperature only if changed? 1 = Yes 0 = No
 
 #define ONE_WIRE_BUS 8 // Pin where dallas sensor is connected
-#define MAX_ATTACHED_DS18B20 8
+#define MAX_ATTACHED_DS18B20 12
 
 #include <EEPROM.h>
+// MySensors uses some EEPROM, and defines the start
 #ifndef EEPROM_LOCAL_CONFIG_ADDRESS
 #define EEPROM_START (700)
 #else
@@ -84,12 +85,15 @@ unsigned long lastCommandDateTime=0;
 #endif
 // To make the index constant, use this initialiser
 const DeviceAddress knownDeviceAddresses[]= {
-  {0x28, 0x38, 0xC0, 0x1F, 0x0E, 0x00, 0x00, 0x26},
-  {0x28, 0xB6, 0xC6, 0x1E, 0x0E, 0x00, 0x00, 0xCC},
-  {0x28, 0x83, 0x91, 0x1F, 0x0E, 0x00, 0x00, 0x81},
-  {0x28, 0x7F, 0xAB, 0xF6, 0x0D, 0x00, 0x00, 0x89},
-  {0x28, 0x7F, 0xA7, 0xF6, 0x0D, 0x00, 0x00, 0xA8}
+  {0x28, 0xF8, 0xC6, 0x16, 0x3A, 0x19, 0x01, 0xF6}, // waterproof, hot water sensor
+  {0x28, 0x38, 0xC0, 0x1F, 0x0E, 0x00, 0x00, 0x26}, // cold water
+  {0x28, 0xB6, 0xC6, 0x1E, 0x0E, 0x00, 0x00, 0xCC}, // south-east (front) hot out heater
+  {0x28, 0x83, 0x91, 0x1F, 0x0E, 0x00, 0x00, 0x81}, // se return
+  {0x28, 0x7F, 0xAB, 0xF6, 0x0D, 0x00, 0x00, 0x89}, // nw (back) hot out heater
+  {0x28, 0x7F, 0xA7, 0xF6, 0x0D, 0x00, 0x00, 0xA8}  // nw return
 };
+DeviceAddress *firstFreeInRom=EEPROM_START+sizeof(knownDeviceAddresses);
+uint8_t entriesInRom=0;
 
 #define LED_PIN LED_BUILTIN
 #define FADE_DELAY 10  // Delay in ms for each percentage fade up/down (10ms = 1s full, 0xrange dim)
@@ -98,8 +102,8 @@ unsigned long SLEEP_TIME = 200; // Sleep time between reads (in milliseconds)
 
 
 OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-DallasTemperature sensors(&oneWire); // Pass the oneWire reference to Dallas Temperature.
-DeviceAddress deviceAddresses[MAX_ATTACHED_DS18B20];
+DallasTemperature sensors(&oneWire,ONE_WIRE_BUS); // Pass the oneWire reference to Dallas Temperature.
+DeviceAddress *deviceAddresses=EEPROM_START;
 float lastTemperature[MAX_ATTACHED_DS18B20];
 unsigned long lastTemperatureUpdateMillis[MAX_ATTACHED_DS18B20];
 int numSensors=0;
@@ -143,16 +147,52 @@ while (!Serial) ;
   sensors.begin();
   DeviceAddress deviceAddress;
   oneWire.reset_search();
+  copyKnownDeviceAddressesToEEPROM();
+# ifdef MY_DEBUG
+  Serial.print(F("setup: EEPROM_START,firstFreeInRom="));Serial.print(EEPROM_START);Serial.print(F(", "));Serial.println((uint32_t)firstFreeInRom);
+  #endif
   uint8_t i=0;
   while (oneWire.search(deviceAddress)) {
+#   ifdef MY_DEBUG
     Serial.print(F("setup: found from search deviceAddress:"));printDeviceAddress(deviceAddress);
     Serial.print( F("Setup, numSensors=") );Serial.print(sensors.getDeviceCount());Serial.print(F(", MAX_ATTACHED_DS18B20="));Serial.println(MAX_ATTACHED_DS18B20);
+    #endif
     //printDallasTemperature(oneWire,deviceAddress);
-    for (uint8_t j=0;j<8;j++) deviceAddresses[i][j]=deviceAddress[j];
-    Serial.println(F("Copied from .. to:"));printDeviceAddress(deviceAddress);printDeviceAddress(deviceAddresses[i]);Serial.println(F("Finished copy"));
+    //for (uint8_t j=0;j<8;j++) deviceAddresses[i][j]=deviceAddress[j];
+    //Serial.println(F("Copied from .. to:"));printDeviceAddress(deviceAddress);printDeviceAddress(deviceAddresses[i]);Serial.println(F("Finished copy"));
+    // Lookup if known address
+    bool found=false;
+    for (uint8_t i1=0;i1<MAX_ATTACHED_DS18B20 && i1<entriesInRom;i1++) {
+      #ifdef MY_DEBUG
+      Serial.print(F("EEPROM_START+i1*sizeof(deviceAddress)="));Serial.print(EEPROM_START+i1*sizeof(deviceAddress));
+      Serial.print(F(", i1="));Serial.print(i1);
+      Serial.print(F(", sizeof(deviceAddress)="));Serial.println(sizeof(deviceAddress));
+      #endif
+      DeviceAddress da;
+      EEPROM.get(EEPROM_START+i1*sizeof(deviceAddress),da);
+      if (memcmp(deviceAddress,da,sizeof(deviceAddress))==0) {
+        // found a match
+        #ifdef MY_DEBUG
+        Serial.print(F("Found known device:"));printDeviceAddress(deviceAddress);Serial.print(F(" in rom at index "));Serial.println(i1);
+        #endif
+        found=true;
+        break;
+      }
+    }
+    if (!found) {
+      // New address
+      #ifdef MY_DEBUG
+      Serial.print(F("Found new device:"));printDeviceAddress(deviceAddress);Serial.print(F(", write to rom "));
+      Serial.println((uint32_t)firstFreeInRom);
+      #endif
+      // write to rom
+      EEPROM.put((uint32_t)firstFreeInRom,deviceAddress);firstFreeInRom++;
+      #ifdef MY_DEBUG
+      Serial.print(F("New firstFreeInRom: "));Serial.println((uint32_t)firstFreeInRom);
+      #endif
+    }
     i++;
   }
-  copyKnownDeviceAddressesToEEPROM();
   sensors.requestTemperatures();
   int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution());
   Serial.print( F(", conversionTime=") );Serial.println(conversionTime);
@@ -228,17 +268,28 @@ void loop()
 void copyKnownDeviceAddressesToEEPROM() {
   // put, only updated data, into rom from first free address from mysensors
   EEPROM.put(EEPROM_START,knownDeviceAddresses);
+  //firstFreeInRom=EEPROM_START+sizeof(knownDeviceAddresses);
+  entriesInRom=sizeof(knownDeviceAddresses)/sizeof(DeviceAddress);
   #ifdef MY_DEBUG
-  for (uint8_t i=0;i<(sizeof(knownDeviceAddresses)/sizeof(knownDeviceAddresses[0]));i++) {
-    Serial.print("copyKnownDeviceAddressesToEEPROM, i=");Serial.println(i);
+  printRomContents();
+  #endif
+}
+void addDeviceToRom(DeviceAddress da) {
+  EEPROM.put((uint16_t)firstFreeInRom,da);
+  entriesInRom++;
+  #ifdef MY_DEBUG
+  Serial.print(F("addDeviceToRom: firstFreeInRom="));Serial.print((uint16_t)firstFreeInRom);Serial.print(F(", entriesInRom="));Serial.println(entriesInRom);
+  #endif
+}
+void printRomContents() {
+  for (uint8_t i=0;i<MAX_ATTACHED_DS18B20;i++) {
+    Serial.print("printRomContents, i=");Serial.println(i);
     // Print the address to EEPROM
     DeviceAddress da;
     EEPROM.get(EEPROM_START+i*sizeof(DeviceAddress),da);
     printDeviceAddress(da);
   }
-  #endif
 }
-
 #ifdef MY_DEBUG
 void printDeviceAddress(DeviceAddress deviceAddress)
 {
