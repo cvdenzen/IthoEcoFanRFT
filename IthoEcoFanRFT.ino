@@ -74,7 +74,7 @@ unsigned long lastCommandDateTime = 0;
 #define COMPARE_TEMP 1  // Send temperature only if changed? 1 = Yes 0 = No
 
 #define ONE_WIRE_BUS 8  // Pin where dallas sensor is connected
-#define MAX_ATTACHED_DS18B20 12
+#define MAX_ATTACHED_DS18B20 16
 
 #include <EEPROM.h>
 // MySensors uses some EEPROM, and defines the start
@@ -92,8 +92,10 @@ const DeviceAddress knownDeviceAddresses[] = {
   { 0x28, 0x7F, 0xAB, 0xF6, 0x0D, 0x00, 0x00, 0x89 },  // nw (back) hot out heater
   { 0x28, 0x7F, 0xA7, 0xF6, 0x0D, 0x00, 0x00, 0xA8 }   // nw return
 };
-DeviceAddress *firstFreeInRom = EEPROM_START + sizeof(knownDeviceAddresses);
+uint16_t firstFreeInRom = EEPROM_START + sizeof(knownDeviceAddresses);
 uint8_t entriesInRom = 0;
+#define EEPROM_LOCAL_CONFIG_ADDRESS_2 (EEPROM_START + MAX_ATTACHED_DS18B20 * sizeoaf(DeviceAddress))
+#define EEPROM_TABLE_END (EEPROM_START + MAX_ATTACHED_DS18B20 * sizeof(DeviceAddress))
 
 #define LED_PIN LED_BUILTIN
 #define FADE_DELAY 10  // Delay in ms for each percentage fade up/down (10ms = 1s full, 0xrange dim)
@@ -103,14 +105,13 @@ unsigned long SLEEP_TIME = 200;  // Sleep time between reads (in milliseconds)
 
 OneWire oneWire(ONE_WIRE_BUS);                      // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 DallasTemperature sensors(&oneWire, ONE_WIRE_BUS);  // Pass the oneWire reference to Dallas Temperature.
-DeviceAddress *deviceAddresses = EEPROM_START;
+uint16_t deviceAddresses = EEPROM_START;
 float lastTemperature[MAX_ATTACHED_DS18B20];
 unsigned long lastTemperatureUpdateMillis[MAX_ATTACHED_DS18B20];
 int numSensors = 0;
 bool receivedConfig = false;
 bool metric = true;
 static int16_t currentLevel = 0;  // Current dim level..
-
 
 void before() {
   // Disable watchdog, we are not running on battery, we are listening to commands from gateway
@@ -131,6 +132,7 @@ void before() {
 }
 
 void setup() {
+  DeviceAddress deviceAddress;
   Serial.begin(38400);
   while (!Serial)
     ;
@@ -144,7 +146,6 @@ void setup() {
   }
 
   sensors.begin();
-  DeviceAddress deviceAddress;
   oneWire.reset_search();
   copyKnownDeviceAddressesToEEPROM();
 #ifdef MY_DEBUG
@@ -168,7 +169,7 @@ void setup() {
     //Serial.println(F("Copied from .. to:"));printDeviceAddress(deviceAddress);printDeviceAddress(deviceAddresses[i]);Serial.println(F("Finished copy"));
     // Lookup if known address
     bool found = false;
-    for (uint8_t i1 = 0; i1 < MAX_ATTACHED_DS18B20 && i1 < entriesInRom; i1++) {
+    for (uint8_t i1 = 0; i1 < MAX_ATTACHED_DS18B20 && i1 < MAX_ATTACHED_DS18B20; i1++) {
 #ifdef MY_DEBUG
       Serial.print(F("EEPROM_START+i1*sizeof(deviceAddress)="));
       Serial.print(EEPROM_START + i1 * sizeof(deviceAddress));
@@ -191,31 +192,30 @@ void setup() {
         break;
       }
     }
-    if (!found) {
-// New address
-#ifdef MY_DEBUG
+    if (!found && firstFreeInRom < EEPROM_TABLE_END) {
+      // New address
+      #ifdef MY_DEBUG
       Serial.print(F("Found new device:"));
       printDeviceAddress(deviceAddress);
       Serial.print(F(", write to rom "));
-      Serial.println((uint32_t)firstFreeInRom);
-#endif
+      Serial.println(firstFreeInRom);
+      #endif
       // write to rom
-      EEPROM.put((uint32_t)firstFreeInRom, deviceAddress);
-      firstFreeInRom++;
-#ifdef MY_DEBUG
-      Serial.print(F("New firstFreeInRom: "));
-      Serial.println((uint32_t)firstFreeInRom);
-#endif
+      addDeviceToRom(deviceAddress);
+      #ifdef MY_DEBUG
+      Serial.print(F("Device added, New firstFreeInRom: "));
+      Serial.println(firstFreeInRom);
+      #endif
     }
     i++;
-  }
+  }  // while search for devices
   sensors.requestTemperatures();
   int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution());
   Serial.print(F(", conversionTime="));
   Serial.println(conversionTime);
   for (i = 0; i < entriesInRom; i++) {
     DeviceAddress da;
-    getRomEntry(i, &da);
+    getRomEntry(i, da);
     // Fetch temperatures from Dallas sensors
     delay(conversionTime);
     Serial.print(F("Setup, getTEmpC for address "));
@@ -224,12 +224,12 @@ void setup() {
     Serial.print(F("Setup, Temp (Celcius)="));
     Serial.println(tempCelcius);
   }
-#ifdef MY_DEBUG
+  #ifdef MY_DEBUG
   Serial.print(F("End of setup, numSensors="));
   Serial.print(sensors.getDeviceCount());
   Serial.print(F(", MAX_ATTACHED_DS18B20="));
   Serial.println(MAX_ATTACHED_DS18B20);
-#endif
+  #endif
   delay(1000000);
 }
 
@@ -294,45 +294,66 @@ void loop() {
 void copyKnownDeviceAddressesToEEPROM() {
   // put, only updated data, into rom from first free address from mysensors
   EEPROM.put(EEPROM_START, knownDeviceAddresses);
-  //firstFreeInRom=EEPROM_START+sizeof(knownDeviceAddresses);
+  firstFreeInRom=EEPROM_START+sizeof(knownDeviceAddresses);
   entriesInRom = sizeof(knownDeviceAddresses) / sizeof(DeviceAddress);
-#ifdef MY_DEBUG
+  // Clear other entries
+  for (uint16_t i=firstFreeInRom;i<EEPROM_TABLE_END;i++) EEPROM.update(i,0);
+  #ifdef MY_DEBUG
   printRomContents();
-#endif
+  #endif
 }
 void addDeviceToRom(DeviceAddress da) {
-  EEPROM.put((uint16_t)firstFreeInRom, da);
+  for (uint8_t i=0;i<sizeof(DeviceAddress);i++) EEPROM.put(firstFreeInRom++, da[i]);
+  #ifdef MY_DEBUG
+  Serial.print(F("addDeviceToRom: sizeof(*da)="));Serial.println(sizeof(*da));
+  #endif
   entriesInRom++;
-#ifdef MY_DEBUG
+  printRomContents();
+  // Mark last entry: first byte 0, unless the table is full
+  if (firstFreeInRom < EEPROM_TABLE_END) {
+    EEPROM.put(firstFreeInRom, (uint8_t)0);
+    #ifdef MY_DEBUG
+    Serial.print(F("write table end at firstFreeInRom: "));
+    Serial.println(firstFreeInRom);
+    #endif
+  }
+  #ifdef MY_DEBUG
   Serial.print(F("addDeviceToRom: firstFreeInRom="));
-  Serial.print((uint16_t)firstFreeInRom);
+  Serial.print(firstFreeInRom);
   Serial.print(F(", entriesInRom="));
   Serial.println(entriesInRom);
-#endif
+  #endif
 }
 void printRomContents() {
   for (uint8_t i = 0; i < MAX_ATTACHED_DS18B20; i++) {
     Serial.print("printRomContents, i=");
-    Serial.println(i);
+    Serial.print(i);
     // Print the address to EEPROM
     DeviceAddress da;
     EEPROM.get(EEPROM_START + i * sizeof(DeviceAddress), da);
-    printDeviceAddress(da);
+    printlnDeviceAddress(da);
   }
 }
-void getRomEntry(uint8_t index, DeviceAddress *da) {
-  //DeviceAddress da;
+void getRomEntry(uint8_t index, uint8_t *da_par) {
+  DeviceAddress da;
   EEPROM.get(EEPROM_START + index * sizeof(DeviceAddress), da);
-  Serial.print(F("getRomEntry, da="));printDeviceAddress((uint8_t*)da);Serial.print(F(", index="));Serial.println(index);
+  da_par = da;
+  Serial.print(F("getRomEntry, index, da="));
+  Serial.println(index);
+  printDeviceAddress(da);
 }
 #ifdef MY_DEBUG
 void printDeviceAddress(DeviceAddress deviceAddress) {
+  Serial.print(F(" da="));
   for (uint8_t i = 0; i < 8; i++) {
     //Serial.print("0x");
     if (deviceAddress[i] < 0x10) Serial.print("0");
     Serial.print(deviceAddress[i], HEX);
     if (i < 7) Serial.print("-");
   }
+}
+void printlnDeviceAddress(DeviceAddress deviceAddress) {
+  printDeviceAddress(deviceAddress);
   Serial.println("");
 }
 #endif
