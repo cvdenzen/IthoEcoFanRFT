@@ -1,0 +1,10 @@
+The testTemperatureMultipleSensors.
+
+Define a table with DeviceAddresses of the sensors. This table is the initial table.
+
+At setup, this table will be copied to EEPROM. The onewire bus is scanned and unknown
+devices (that do not appear in the initial table) are added to the EEPROM table.
+
+This static table is used to guarantee a fixed sequence.
+The EEPROM table makes it possible to have "unregistered" sensors added,
+but they will appear with a random "index" in the table.
