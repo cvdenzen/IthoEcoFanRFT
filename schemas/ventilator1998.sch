@@ -1,0 +1,112 @@
+v 20130925 2
+C 40000 40000 0 0 0 title-B.sym
+V 46300 47000 2100 3 0 0 0 -1 -1 0 -1 -1 -1 -1 -1
+P 45200 48100 45200 47800 1 0 0
+{
+T 45200 47800 5 10 0 0 0 0 1
+pintype=pwr
+T 45200 47445 5 10 0 1 90 6 1
+pinlabel=wit/blauw
+T 45150 47595 5 10 0 1 90 0 1
+pinnumber=1
+T 45200 48100 5 10 0 0 0 0 1
+pinseq=1
+T 45200 48100 5 10 1 1 0 0 1
+description=+12V
+}
+T 45000 46900 9 10 1 0 0 0 1
+Achteraanzicht chassisdeel
+L 44700 48200 44800 45700 3 0 0 0 -1 -1
+P 45900 48600 45900 48300 1 0 0
+{
+T 45900 48600 5 10 0 0 0 0 1
+pintype=unknown
+T 45900 47945 5 10 0 1 90 6 1
+pinlabel=unknown
+T 45850 48095 5 10 0 1 90 0 1
+pinnumber=0
+T 45900 48600 5 10 0 0 0 0 1
+pinseq=0
+}
+P 47100 48300 47100 48000 1 0 0
+{
+T 47100 48300 5 10 0 0 0 0 1
+pintype=unknown
+T 47100 47645 5 10 0 1 90 6 1
+pinlabel=unknown
+T 47050 47795 5 10 0 1 90 0 1
+pinnumber=0
+T 47100 48300 5 10 0 0 0 0 1
+pinseq=3
+}
+P 47400 47200 47400 46900 1 0 0
+{
+T 47400 47200 5 10 0 0 0 0 1
+pintype=unknown
+T 47400 46545 5 10 0 1 90 6 1
+pinlabel=unknown
+T 47350 46695 5 10 0 1 90 0 1
+pinnumber=0
+T 47400 47200 5 10 0 0 0 0 1
+pinseq=0
+}
+P 47000 46000 47000 45700 1 0 0
+{
+T 47000 46000 5 10 0 0 0 0 1
+pintype=pwr
+T 47000 45345 5 10 0 1 90 6 1
+pinlabel=GND
+T 46950 45495 5 10 0 1 90 0 1
+pinnumber=5
+T 47000 46000 5 10 0 0 0 0 1
+pinseq=5
+}
+P 45400 45600 45700 45600 1 0 0
+{
+T 45400 45600 5 10 0 0 90 0 1
+pintype=io
+T 45555 45795 5 10 1 1 0 0 1
+pinlabel=switch
+T 45605 45645 5 10 0 1 0 6 1
+pinnumber=6
+T 45400 45600 5 10 0 0 90 0 1
+pinseq=6
+}
+N 45200 48100 45200 50500 4
+{
+T 44600 50100 5 10 1 1 0 0 1
+netname=+12V
+T 44700 50600 5 10 1 1 0 0 1
+comment=blauw/wit
+}
+N 45900 48600 45900 50500 4
+{
+T 45700 50600 5 10 1 1 0 0 1
+comment=blauw
+}
+N 47100 48300 47100 49700 4
+{
+T 46900 49900 5 10 1 1 0 0 1
+comment=oranje/wit
+}
+N 47400 47200 49300 47200 4
+{
+T 48600 47300 5 10 1 1 0 0 1
+comment=oranje
+}
+N 47000 46000 48700 46000 4
+{
+T 48300 45700 5 10 1 1 0 0 1
+comment=groen/wit
+}
+N 45400 45600 45400 44000 4
+{
+T 45600 44100 5 10 0 1 0 0 1
+comment=groen
+}
+T 48900 49500 9 10 1 0 0 0 2
+Alle led's zitten met de anode (lange aansluiting) aan +12V,
+met een weerstand van 2k2 naar de uitgang van een ULN2003A.
+T 50800 47800 9 10 1 0 0 0 2
+VEntilatorsturing uit 1998,
+met 68HC11F1FN of zoiets.

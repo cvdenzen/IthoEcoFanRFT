@@ -1,0 +1,9 @@
+v 20130925 2
+C 40000 40000 0 0 0 title-B.sym
+C 41100 41800 1 0 0 ArduinoProMini-1.sym
+{
+T 39831 44900 5 10 0 1 0 0 1
+device=ARDUINO-PRO-MINI
+T 43100 47600 5 10 1 1 0 0 1
+refdes=U?
+}
