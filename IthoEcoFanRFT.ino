@@ -30,7 +30,8 @@
 #define MY_DEBUG
 //#undef MY_DEBUG
 #define MY_BAUD_RATE 38400
-
+// Disable mysensors (to test only Dallas sensors)
+// #define DISABLE_MYSENSORS
 
 // Enable and select radio type attached
 //#define MY_RADIO_RF24
@@ -56,7 +57,11 @@
 // Comment it out for Auto Node ID #, original was 0x90=144
 #define MY_NODE_ID 156
 
+#ifndef DISABLE_MYSENSORS
 #include <MySensors.h>
+#else
+#include <avr/wdt.h>
+#endif
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #include <ArduinoQueue.h>
 ArduinoQueue<int> cc1101commandQueue(6);
@@ -93,7 +98,28 @@ bool RFTidChk[3] = {false, false, false};
 #define COMPARE_TEMP 1 // Send temperature only if changed? 1 = Yes 0 = No
 
 #define ONE_WIRE_BUS 8 // Pin where dallas sensor is connected
-#define MAX_ATTACHED_DS18B20 1
+#define MAX_ATTACHED_DS18B20 16
+
+#ifndef DISABLE_MYSENSORS
+#include <EEPROM.h>
+#endif
+// MySensors uses some EEPROM, and defines the start
+#ifndef DISABLE_MYSENSORS
+#define EEPROM_START (700)
+#endif
+// To make the index constant, use this initialiser
+const DeviceAddress knownDeviceAddresses[] = {
+  { 0x28, 0xF8, 0xC6, 0x16, 0x3A, 0x19, 0x01, 0xF6 },  // waterproof, hot water sensor
+  { 0x28, 0x38, 0xC0, 0x1F, 0x0E, 0x00, 0x00, 0x26 },  // cold water
+  { 0x28, 0xB6, 0xC6, 0x1E, 0x0E, 0x00, 0x00, 0xCC },  // south-east (front) hot out heater
+  { 0x28, 0x83, 0x91, 0x1F, 0x0E, 0x00, 0x00, 0x81 },  // se return
+  { 0x28, 0x7F, 0xAB, 0xF6, 0x0D, 0x00, 0x00, 0x89 },  // nw (back) hot out heater
+  { 0x28, 0x7F, 0xA7, 0xF6, 0x0D, 0x00, 0x00, 0xA8 }   // nw return
+};
+uint16_t firstFreeInRom = EEPROM_START + sizeof(knownDeviceAddresses);
+uint8_t entriesInRom = 0;
+#define EEPROM_LOCAL_CONFIG_ADDRESS_2 (EEPROM_START + MAX_ATTACHED_DS18B20 * sizeoaf(DeviceAddress))
+#define EEPROM_TABLE_END (EEPROM_START + MAX_ATTACHED_DS18B20 * sizeof(DeviceAddress))
 
 #define LED_PIN LED_BUILTIN
 #define FADE_DELAY 10  // Delay in ms for each percentage fade up/down (10ms = 1s full-range dim)
@@ -103,9 +129,9 @@ unsigned long SLEEP_TIME = 200; // Sleep time between reads (in milliseconds)
 
 OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 DallasTemperature sensors(&oneWire); // Pass the oneWire reference to Dallas Temperature.
+uint16_t deviceAddresses = EEPROM_START;
 float lastTemperature[MAX_ATTACHED_DS18B20];
 unsigned long lastTemperatureUpdateMillis[MAX_ATTACHED_DS18B20];
-int numSensors=0;
 bool receivedConfig = false;
 bool metric = true;
 // Initialize temperature message
@@ -116,7 +142,7 @@ MyMessage fanMsg(0,V_VAR1); // custom, from controller to mysensor to fan
 MyMessage fromCC1101(0,V_VAR1); // custom, from CC1101 to controller (openhab)
 MyMessage idFromCC1101(0,V_VAR2); // custom, first 3 id fields (to detect interfering itho remotes)
 
-
+// Optional method - for initialisations that needs to take place before MySensors transport has been setup (eg: SPI devices).
 void before()
 {
   wdt_disable();
@@ -127,18 +153,88 @@ void before()
 #endif
   sensors.begin();
   //Serial.println("before(): after sensors.begin");
-  
-
 }
 
 void setup()
 {
   setupArjen();
+  DeviceAddress deviceAddress;
+  Serial.begin(38400);
+  while (!Serial)
+    ;
+#ifdef MY_DEBUG
+  Serial.print(F("==================== Start setup for mysensors node number "));
+  Serial.println(MY_NODE_ID);
+#endif
   for (int i=0;i<MAX_ATTACHED_DS18B20;i++) {
     lastTemperatureUpdateMillis[i]=0;
-    lastTemperature[i]=0.0;
+    lastTemperature[i]=-150.0;
   }
+
+  oneWire.reset_search();
+  copyKnownDeviceAddressesToEEPROM();
 #ifdef MY_DEBUG
+  Serial.print(F("setup: EEPROM_START,firstFreeInRom="));
+  Serial.print(EEPROM_START);
+  Serial.print(F(", "));
+  Serial.println((uint32_t)firstFreeInRom);
+#endif
+  uint8_t i = 0;
+  while (oneWire.search(deviceAddress)) {
+#ifdef MY_DEBUG
+    Serial.print(F("setup: found from search deviceAddress:"));
+    printDeviceAddress(deviceAddress);
+    Serial.print(F("Setup, numSensors="));
+    Serial.print(sensors.getDeviceCount());
+    Serial.print(F(", MAX_ATTACHED_DS18B20="));
+    Serial.println(MAX_ATTACHED_DS18B20);
+#endif
+    //printDallasTemperature(oneWire,deviceAddress);
+    //for (uint8_t j=0;j<8;j++) deviceAddresses[i][j]=deviceAddress[j];
+    //Serial.println(F("Copied from .. to:"));printDeviceAddress(deviceAddress);printDeviceAddress(deviceAddresses[i]);Serial.println(F("Finished copy"));
+    // Lookup if known address
+    bool found = false;
+    for (uint8_t i1 = 0; i1 < MAX_ATTACHED_DS18B20 && i1 < MAX_ATTACHED_DS18B20; i1++) {
+#ifdef MY_DEBUG
+      Serial.print(F("EEPROM_START+i1*sizeof(deviceAddress)="));
+      Serial.print(EEPROM_START + i1 * sizeof(deviceAddress));
+      Serial.print(F(", i1="));
+      Serial.print(i1);
+      Serial.print(F(", sizeof(deviceAddress)="));
+      Serial.println(sizeof(deviceAddress));
+#endif
+      DeviceAddress da;
+      EEPROM.get(EEPROM_START + i1 * sizeof(deviceAddress), da);
+      if (memcmp(deviceAddress, da, sizeof(deviceAddress)) == 0) {
+// found a match
+#ifdef MY_DEBUG
+        Serial.print(F("Found known device:"));
+        printDeviceAddress(deviceAddress);
+        Serial.print(F(" in rom at index "));
+        Serial.println(i1);
+#endif
+        found = true;
+        break;
+      }
+    }
+    if (!found && firstFreeInRom < EEPROM_TABLE_END) {
+      // New address
+      #ifdef MY_DEBUG
+      Serial.print(F("Found new device:"));
+      printDeviceAddress(deviceAddress);
+      Serial.print(F(", write to rom "));
+      Serial.println(firstFreeInRom);
+      #endif
+      // write to rom
+      addDeviceToRom(deviceAddress);
+      #ifdef MY_DEBUG
+      Serial.print(F("Device added, New firstFreeInRom: "));
+      Serial.println(firstFreeInRom);
+      #endif
+    }
+    i++;
+  }  // while search for devices
+  #ifdef MY_DEBUG
   Serial.print(F("End setup for node number "));Serial.println(MY_NODE_ID);
 #endif
 }
@@ -149,18 +245,19 @@ void presentation() {
   sendSketchInfo("FanAttic_156", "1.1");
 
   // Fetch the number of attached temperature sensors
-  numSensors=1; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!numSensors = sensors.getDeviceCount();
+  // numSensors = sensors.getDeviceCount();
 
-  // Present all sensors to controller
-  for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {
-     present(i+1, S_TEMP);
+  // Present all sensors to controller, mySensors start with 1
+  uint8_t i;
+  for (i=1; i<=MAX_ATTACHED_DS18B20; i++) {
+     present(i, S_TEMP);
+     wait(5000); // to avoid NACK problems?
   }
-
-  present(7,S_DIMMER);
-  present(8,S_CUSTOM); // from controller to itho fan
-  present(9,S_CUSTOM); // from cc1101 receiver to controller (openhab)
-  present(10,S_CUSTOM); // id in packet from cc1101 receiver to controller
+  // was 7..10
+  present(i++,S_TEMP);
+  present(i++,S_CUSTOM); // from controller to itho fan
+  present(i++,S_CUSTOM); // from cc1101 receiver to controller (openhab)
+  present(i++,S_CUSTOM); // id in packet from cc1101 receiver to controller
 }
 
 void receive(const MyMessage &message) {
@@ -191,10 +288,14 @@ void loop()
   int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution());
   // sleep() call can be replaced by wait() call if node need to process incoming messages (or if node is repeater)
   //sleep(conversionTime);
+#ifndef DISABLE_MYSENSORS
   wait(conversionTime);
+#else
+  delay(conversionTime);
+#endif
 
   // Read temperatures and send them to controller
-  for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {
+  for (int i=0; i<i<MAX_ATTACHED_DS18B20; i++) {
 
     // Fetch and round temperature to one decimal
     float temperature = static_cast<float>(static_cast<int>((getControllerConfig().isMetric?sensors.getTempCByIndex(i):sensors.getTempFByIndex(i)) * 10.)) / 10.;
@@ -211,6 +312,7 @@ void loop()
           ||(abs(tempDiff)>2.0)) {
         // Send in the new temperature with 1 decimal
         send(msg.setSensor(i).set(temperature,1),false);
+        wait(1000);
         // Save new temperatures for next compare
         lastTemperature[i]=temperature;
         lastTemperatureUpdateMillis[i]=millis();
@@ -218,9 +320,11 @@ void loop()
     }
   } // for int i=0..
 
-  loopArjen();
-
+#ifndef DISABLE_MYSENSORS
   wait(SLEEP_TIME);
+#else
+  delay(SLEEP_TIME);
+#endif
 }
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Start ArjenHiemstra Itho
@@ -417,4 +521,108 @@ void sendTimer() {
 
   // End of ArjenHiemstra's IthoEcoFan
   // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  
+void copyKnownDeviceAddressesToEEPROM() {
+  // put, only updated data, into rom from first free address from mysensors
+  #ifdef DISABLE_MYSENSORS
+  EEPROM.put(EEPROM_START, knownDeviceAddresses);
+  firstFreeInRom=EEPROM_START+sizeof(knownDeviceAddresses);
+  // Clear other entries
+  for (uint16_t i=firstFreeInRom;i<EEPROM_TABLE_END;i++) EEPROM.update(i,0);
+  #else
+  // use mysensors EEPROM management
+  uint8_t i=0;
+  for (;i<sizeof(knownDeviceAddresses);i++) {
+    saveState(i,knownDeviceAddresses[i]);
+  }
+  // Clear other entries
+  for (;i<MAX_ATTACHED_DS18B20;i++) {
+    saveState(i,0);
+  }
+  #endif
+  entriesInRom = sizeof(knownDeviceAddresses) / sizeof(DeviceAddress);
+  #ifdef MY_DEBUG
+  printRomContents();
+  #endif
+}
+void addDeviceToRom(DeviceAddress da) {
+  for (uint8_t i=0;i<sizeof(DeviceAddress);i++) EEPROM.put(firstFreeInRom++, da[i]);
+  #ifdef MY_DEBUG
+  Serial.print(F("addDeviceToRom: sizeof(*da)="));Serial.println(sizeof(*da));
+  #endif
+  entriesInRom++;
+  printRomContents();
+  // Mark last entry: first byte 0, unless the table is full
+  if (firstFreeInRom < EEPROM_TABLE_END) {
+    EEPROM.put(firstFreeInRom, (uint8_t)0);
+    #ifdef MY_DEBUG
+    Serial.print(F("write table end at firstFreeInRom: "));
+    Serial.println(firstFreeInRom);
+    #endif
+  }
+  #ifdef MY_DEBUG
+  Serial.print(F("addDeviceToRom: firstFreeInRom="));
+  Serial.print(firstFreeInRom);
+  Serial.print(F(", entriesInRom="));
+  Serial.println(entriesInRom);
+  #endif
+}
+void printRomContents() {
+  for (uint8_t i = 0; i < MAX_ATTACHED_DS18B20; i++) {
+    Serial.print("printRomContents, i=");
+    Serial.print(i);
+    // Print the address to EEPROM
+    DeviceAddress da;
+    EEPROM.get(EEPROM_START + i * sizeof(DeviceAddress), da);
+    printlnDeviceAddress(da);
+  }
+}
+void getRomEntry(uint8_t index, uint8_t *da_par) {
+  DeviceAddress da;
+  EEPROM.get(EEPROM_START + index * sizeof(DeviceAddress), da);
+  da_par = da;
+  Serial.print(F("getRomEntry, index, da="));
+  Serial.println(index);
+  printDeviceAddress(da);
+}
+#ifdef MY_DEBUG
+void printDeviceAddress(DeviceAddress deviceAddress) {
+  Serial.print(F(" da="));
+  for (uint8_t i = 0; i < 8; i++) {
+    //Serial.print("0x");
+    if (deviceAddress[i] < 0x10) Serial.print("0");
+    Serial.print(deviceAddress[i], HEX);
+    if (i < 7) Serial.print("-");
+  }
+}
+void printlnDeviceAddress(DeviceAddress deviceAddress) {
+  printDeviceAddress(deviceAddress);
+  Serial.println("");
+}
+#endif
+void printDallasTemperature(OneWire oneWire, DeviceAddress addr) {
+  // The DallasTemperature library can do all this work for you!
+
+  oneWire.reset();
+  oneWire.select(addr);
+  oneWire.write(0x44, 1);  // start conversion, with parasite power on at the end
+
+  delay(1000);  // maybe 750ms is enough, maybe not
+  // we might do a ds.depower() here, but the reset will take care of it.
+
+  boolean present = oneWire.reset();
+  oneWire.select(addr);
+  oneWire.write(0xBE);  // Read Scratchpad
+
+  Serial.print("P=");
+  Serial.print(present, HEX);
+  Serial.print(" ");
+  uint8_t data[8];
+  for (uint8_t i = 0; i < 9; i++) {  // we need 9 bytes
+    data[i] = oneWire.read();
+    Serial.print(data[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.print(" CRC=");
+  Serial.print(OneWire::crc8(data, 8), HEX);
+  Serial.println();
+}
