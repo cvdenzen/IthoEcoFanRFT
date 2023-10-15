@@ -68,4 +68,4 @@ receive commands to control the fan (e.g. because the pir sensor in the bathroom
 
 ntc sensor for hot water sensing: 3 resistors, ntc is 47k at 20 degrees C.
 
-Voeding: hilink 3.3V voeding.
+Voeding: old usb adapter 5V. On board 3.3 V low drop stabilizer.
