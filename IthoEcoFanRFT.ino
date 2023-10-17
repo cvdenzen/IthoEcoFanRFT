@@ -100,11 +100,9 @@ bool RFTidChk[3] = {false, false, false};
 #define ONE_WIRE_BUS 8 // Pin where dallas sensor is connected
 #define MAX_ATTACHED_DS18B20 16
 
-#ifndef DISABLE_MYSENSORS
+#ifdef DISABLE_MYSENSORS
 #include <EEPROM.h>
-#endif
 // MySensors uses some EEPROM, and defines the start
-#ifndef DISABLE_MYSENSORS
 #define EEPROM_START (700)
 #endif
 // To make the index constant, use this initialiser
@@ -195,24 +193,29 @@ void setup()
     // Lookup if known address
     bool found = false;
     for (uint8_t i1 = 0; i1 < MAX_ATTACHED_DS18B20 && i1 < MAX_ATTACHED_DS18B20; i1++) {
-#ifdef MY_DEBUG
+      #ifdef MY_DEBUG
+      #ifdef DISABLE_MYSENSORS
       Serial.print(F("EEPROM_START+i1*sizeof(deviceAddress)="));
       Serial.print(EEPROM_START + i1 * sizeof(deviceAddress));
+      #endif
+      Serial.print(F(", firstFreeInRom="));Serial.print(firstFreeInRom);
+      Serial.print(F(", entriesInRom="));Serial.print(entriesInRom);
       Serial.print(F(", i1="));
       Serial.print(i1);
       Serial.print(F(", sizeof(deviceAddress)="));
       Serial.println(sizeof(deviceAddress));
-#endif
+      
+      #endif
       DeviceAddress da;
-      EEPROM.get(EEPROM_START + i1 * sizeof(deviceAddress), da);
+      getRomEntry(i1,da);
       if (memcmp(deviceAddress, da, sizeof(deviceAddress)) == 0) {
-// found a match
-#ifdef MY_DEBUG
+        // found a match
+        #ifdef MY_DEBUG
         Serial.print(F("Found known device:"));
         printDeviceAddress(deviceAddress);
         Serial.print(F(" in rom at index "));
         Serial.println(i1);
-#endif
+        #endif
         found = true;
         break;
       }
@@ -251,10 +254,10 @@ void presentation() {
   uint8_t i;
   for (i=1; i<=MAX_ATTACHED_DS18B20; i++) {
      present(i, S_TEMP);
-     wait(5000); // to avoid NACK problems?
+     wait(200); // to avoid NACK problems?
   }
   // was 7..10
-  present(i++,S_TEMP);
+  present(i++,S_TEMP); // The original temperature sensor
   present(i++,S_CUSTOM); // from controller to itho fan
   present(i++,S_CUSTOM); // from cc1101 receiver to controller (openhab)
   present(i++,S_CUSTOM); // id in packet from cc1101 receiver to controller
@@ -288,17 +291,19 @@ void loop()
   int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution());
   // sleep() call can be replaced by wait() call if node need to process incoming messages (or if node is repeater)
   //sleep(conversionTime);
-#ifndef DISABLE_MYSENSORS
+  #ifndef DISABLE_MYSENSORS
   wait(conversionTime);
-#else
+  #else
   delay(conversionTime);
-#endif
-
+  #endif
+  DeviceAddress deviceAddress;
   // Read temperatures and send them to controller
   for (int i=0; i<i<MAX_ATTACHED_DS18B20; i++) {
-
+    getRomEntry(i,deviceAddress);
     // Fetch and round temperature to one decimal
-    float temperature = static_cast<float>(static_cast<int>((getControllerConfig().isMetric?sensors.getTempCByIndex(i):sensors.getTempFByIndex(i)) * 10.)) / 10.;
+    float temperature = 
+      static_cast<float>(static_cast<int>((getControllerConfig()
+                   .isMetric?sensors.getTempC(deviceAddress):sensors.getTempF(deviceAddress)) * 10.)) / 10.;
 
     // Only send data if temperature has changed and no error
     if (temperature != -127.00 && temperature != 85.00
@@ -320,11 +325,11 @@ void loop()
     }
   } // for int i=0..
 
-#ifndef DISABLE_MYSENSORS
+  #ifndef DISABLE_MYSENSORS
   wait(SLEEP_TIME);
-#else
+  #else
   delay(SLEEP_TIME);
-#endif
+  #endif
 }
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Start ArjenHiemstra Itho
@@ -378,9 +383,9 @@ void loopArjen(void) {
     pinMode(CC1101_SS,OUTPUT); // ??
     attachInterrupt(digitalPinToInterrupt(ITHO_IRQ_PIN), ITHOcheck, FALLING);
     // Send x times
-#ifdef MY_DEBUG
+    #ifdef MY_DEBUG
     Serial.print(F("Sending queued command to cc1101: "));Serial.println(receivedIthoCommand);
-#endif
+    #endif
     for (int i=0;i<1;i++) {
       rf.sendCommand(receivedIthoCommand);
     }
@@ -531,11 +536,17 @@ void copyKnownDeviceAddressesToEEPROM() {
   #else
   // use mysensors EEPROM management
   uint8_t i=0;
+  uint8_t *p=&knownDeviceAddresses[0][0];
   for (;i<sizeof(knownDeviceAddresses);i++) {
-    saveState(i,knownDeviceAddresses[i]);
+    saveState(i,*p++);
+    #ifdef MY_DEBUG
+    //Serial.print(F("copyKnownDeviceAdresses i="));Serial.print(i);Serial.print(F(", p="));Serial.print((uint32_t)p);
+    //Serial.print(F(", loadState(i)="));Serial.println(loadState(i),HEX);
+    #endif
   }
+  firstFreeInRom=i;
   // Clear other entries
-  for (;i<MAX_ATTACHED_DS18B20;i++) {
+  for (;i<MAX_ATTACHED_DS18B20 * sizeof(DeviceAddress) && i<255;i++) {
     saveState(i,0);
   }
   #endif
@@ -545,15 +556,30 @@ void copyKnownDeviceAddressesToEEPROM() {
   #endif
 }
 void addDeviceToRom(DeviceAddress da) {
-  for (uint8_t i=0;i<sizeof(DeviceAddress);i++) EEPROM.put(firstFreeInRom++, da[i]);
+  for (uint8_t i=0;i<sizeof(DeviceAddress);i++) {
+    #ifdef MY_DEBUG
+    Serial.print(F("addDeviceToRom: sizeof(*da)="));Serial.print(sizeof(*da));
+    Serial.print(F(", i="));Serial.println(i);
+    #endif
+    #ifdef DISABLE_MYSENSORS
+    EEPROM.put(firstFreeInRom++, da[i]);
+    #else
+    // mysensors has own functions for eeprom management
+    saveState(firstFreeInRom++,da[i]);
+    #endif
+  }
   #ifdef MY_DEBUG
-  Serial.print(F("addDeviceToRom: sizeof(*da)="));Serial.println(sizeof(*da));
+  Serial.print(F("addDeviceToRom2: sizeof(*da)="));Serial.println(sizeof(*da));
   #endif
   entriesInRom++;
   printRomContents();
   // Mark last entry: first byte 0, unless the table is full
   if (firstFreeInRom < EEPROM_TABLE_END) {
+    #ifdef DISABLE_MYSENSORS
     EEPROM.put(firstFreeInRom, (uint8_t)0);
+    #else
+    saveState(firstFreeInRom,0);
+    #endif
     #ifdef MY_DEBUG
     Serial.print(F("write table end at firstFreeInRom: "));
     Serial.println(firstFreeInRom);
@@ -567,22 +593,44 @@ void addDeviceToRom(DeviceAddress da) {
   #endif
 }
 void printRomContents() {
+  #ifndef DISABLE_MYSENSORS;
+  uint8_t rp=0; // rom pointer
+  #endif
   for (uint8_t i = 0; i < MAX_ATTACHED_DS18B20; i++) {
     Serial.print("printRomContents, i=");
     Serial.print(i);
     // Print the address to EEPROM
     DeviceAddress da;
+    #ifdef DISABLE_MYSENSORS
     EEPROM.get(EEPROM_START + i * sizeof(DeviceAddress), da);
+    #else
+    for (uint8_t j=0;j<sizeof(DeviceAddress);j++) {
+      uint8_t x=loadState(rp++);
+      #ifdef MY_DEBUG
+      Serial.print(F("printRomContents, loadState="));Serial.println(x,HEX);
+      #endif
+      da[j]=x;
+    }
+    #endif
     printlnDeviceAddress(da);
   }
 }
 void getRomEntry(uint8_t index, uint8_t *da_par) {
-  DeviceAddress da;
-  EEPROM.get(EEPROM_START + index * sizeof(DeviceAddress), da);
-  da_par = da;
+  //DeviceAddress da;
+  #ifdef DISABLE_MYSENSORS
+  EEPROM.get(EEPROM_START + index * sizeof(DeviceAddress), da_par);
+  #else
+  uint8_t j=0;
+  for (uint8_t i=index*sizeof(DeviceAddress);j<sizeof(DeviceAddress);i++,j++) {
+    da_par[j]=loadState(i);
+  }
+  #endif
+  //da_par = da; // ?????????????
+  #ifdef MY_DEBUG
   Serial.print(F("getRomEntry, index, da="));
-  Serial.println(index);
-  printDeviceAddress(da);
+  Serial.print(index);Serial.print(F(", "));
+  printlnDeviceAddress(da_par);
+  #endif
 }
 #ifdef MY_DEBUG
 void printDeviceAddress(DeviceAddress deviceAddress) {
