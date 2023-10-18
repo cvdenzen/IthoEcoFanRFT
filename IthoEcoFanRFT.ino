@@ -27,7 +27,7 @@
 
 
 // Enable debug prints to serial monitor
-#define MY_DEBUG
+// #define MY_DEBUG
 //#undef MY_DEBUG
 #define MY_BAUD_RATE 38400
 // Disable mysensors (to test only Dallas sensors)
@@ -566,11 +566,10 @@ void addDeviceToRom(DeviceAddress da) {
     saveState(firstFreeInRom++,da[i]);
     #endif
   }
-  #ifdef MY_DEBUG
-  Serial.print(F("addDeviceToRom2: sizeof(*da)="));Serial.println(sizeof(*da));
-  #endif
   entriesInRom++;
+  #ifdef MY_DEBUG
   printRomContents();
+  #endif
   // Mark last entry: first byte 0, unless the table is full
   if (firstFreeInRom < EEPROM_TABLE_END) {
     #ifdef DISABLE_MYSENSORS
@@ -590,6 +589,7 @@ void addDeviceToRom(DeviceAddress da) {
   Serial.println(entriesInRom);
   #endif
 }
+#ifdef MY_DEBUG
 void printRomContents() {
   #ifndef DISABLE_MYSENSORS;
   uint8_t rp=0; // rom pointer
@@ -608,6 +608,7 @@ void printRomContents() {
     Serial.print(F("printRomContents, i="));Serial.print(i);Serial.print(F(""));printlnDeviceAddress(da);
   }
 }
+#endif MY_DEBUG
 void getRomEntry(uint8_t index, uint8_t *da_par) {
   //DeviceAddress da;
   #ifdef DISABLE_MYSENSORS
