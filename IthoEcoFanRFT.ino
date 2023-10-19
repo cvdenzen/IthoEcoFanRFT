@@ -332,6 +332,7 @@ void loop()
   #else
   delay(SLEEP_TIME);
   #endif
+  loopArjen();
 }
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Start ArjenHiemstra Itho
