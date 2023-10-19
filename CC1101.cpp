@@ -44,8 +44,10 @@ void CC1101::spi_waitMiso(unsigned long maxDurationMillis)
     while((digitalRead(MISO) == HIGH) && (millis()<maxMillis)) yield();
 #ifdef CC1101_REPORT_TIMEOUTS
     if (millis()>=maxMillis) {
+      #ifdef MY_DEBUG
       Serial.print(F("CC1101::spi_waitMiso timeout, timeout (milliseconds)="));Serial.println(maxDurationMillis);
       //Serial.print(" ");Serial.print(startMillis);Serial.print(" ");Serial.print(maxMillis);Serial.print(" ");
+      #endif MY_DEBUG
       //Serial.println(millis());
       delay(1000);
     }

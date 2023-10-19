@@ -178,8 +178,9 @@ void IthoCC1101::initReceive()
     PA ramping      enabled
     Whitening     disabled
   */
-  
+  #ifdef MY_DEBUG
   Serial.println(F("ithoCC1101::initReceive start"));
+  #endif MY_DEBUG
   writeCommand(CC1101_SRES);
 
   writeRegister(CC1101_TEST0 , 0x09);
@@ -266,8 +267,9 @@ void IthoCC1101::initReceive()
   writeRegister(CC1101_IOCFG0 , 0x0D);      //Serial Data Output. Used for asynchronous serial mode.
 
   writeCommand(CC1101_SRX);
-
+  #ifdef MY_DEBUG
   Serial.println(F("ithoCC1101::initReceive before while"));
+  #endif MY_DEBUG
 
   // Wait for status is "receive"
     maxDurationMillis=10000; // max 10 seconds
@@ -277,8 +279,10 @@ void IthoCC1101::initReceive()
       && (millis()<maxMillis)) yield(); yield();
 #ifdef CC1101_REPORT_TIMEOUTS
   if (millis()>=maxMillis) {
+      #ifdef MY_DEBUG
       Serial.print(F("CC1101::initReceive wait for MARCSTATE_RX timeout, timeout (milliseconds)"));Serial.println(maxDurationMillis);
       //Serial.print("CC101_MARCSTATE=");Serial.println(readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER));
+      #endif MY_DEBUG
   }
 #endif
 
@@ -320,8 +324,10 @@ void  IthoCC1101::initReceiveMessage()
   }
 #ifdef CC1101_REPORT_TIMEOUTS
   if (millis()>=maxMillis) {
+      #ifdef MY_DEBUG
       Serial.print(F("CC1101::initReceiveMessage wait for MARCSTATE_RX timeout, timeout (milliseconds)"));Serial.println(maxDurationMillis);
       //Serial.print("CC101_MARCSTATE=");Serial.println(readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER));
+      #endif MY_DEBUG
   }
 #endif
 }
