@@ -53,12 +53,23 @@ Connections between the CC1101 and the ESP8266 or Arduino:
 CC11xx pins    ESP pins Arduino pins  Description
 *  1 - VCC        VCC      VCC           3v3
 *  2 - GND        GND      GND           Ground
-*  3 - MOSI       13=D7    Pin 11        Data input to CC11xx
-*  4 - SCK        14=D5    Pin 13        Clock pin
-*  5 - MISO/GDO1  12=D6    Pin 12        Data output from CC11xx / serial clock from CC11xx
+*  3 - MOSI       13=D7    Pin 11        Data input to CC11xx (blue)
+*  4 - SCK        14=D5    Pin 13        Clock pin (green)
+*  5 - MISO/GDO1  12=D6    Pin 12        Data output from CC11xx / serial clock from CC11xx (purple)
 *  6 - GDO2       04=D2    Pin  2        Programmable output
 *  7 - GDO0       ?        Pin  ?        Programmable output
-*  8 - CSN        15=D8    Pin 10        Chip select / (SPI_SS)
+*  8 - CSN        15=D8    Pin 10        Chip select / (SPI_SS) (white)
+
+
+RFM69CW
+ANT                    GND n/c
+3V3 orange
+GND black
+DIO1? n/c
+MOSI blue
+SCK  green
+NSS  grey?             MISO purple
+
 
 Maybe RFM69:DIO0 and CC11:GD02 should be changed, depending on library possibilities
 Mysensors looks simple to configure this IRQ pin, so pin 3 should be nice.
